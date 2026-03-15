@@ -5,3 +5,4 @@
 *.json
 *__pycache__*
 *.pbf
+files/

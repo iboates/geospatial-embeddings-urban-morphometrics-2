@@ -9,6 +9,8 @@ from pathlib import Path
 
 import geopandas as gpd
 
+from urban_morphometrics.osm_loader import load_osm_data
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -127,6 +129,14 @@ def compute_urban_morphometrics(
     log.info("Conformal CRS: %s", conformal_crs)
     log.info("Debug: %s", debug)
     log.info("Metrics (%d): %s", len(metrics), ", ".join(metrics))
+
+    osm_data = load_osm_data(pbf_path, study_area_gdf)
+
+    if debug:
+        log.info("Writing debug OSM layers...")
+        osm_data.buildings.to_file(debug_dir / "buildings.gpkg", driver="GPKG")
+        osm_data.highways.to_file(debug_dir / "highways.gpkg", driver="GPKG")
+        osm_data.landuse.to_file(debug_dir / "landuse.gpkg", driver="GPKG")
 
 
 def _build_parser() -> argparse.ArgumentParser:
