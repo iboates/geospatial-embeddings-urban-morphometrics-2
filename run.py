@@ -13,7 +13,7 @@ def run_main():
     compute_urban_morphometrics(
         study_area_gdf=regions_gdf,
         pbf_path=pbf_url,
-        run_name="my_run",
+        run_name="my_run2",
         neighbourhood_distance=200,
         num_quantiles=4,
         # metrics=["volume", "floor_area"],

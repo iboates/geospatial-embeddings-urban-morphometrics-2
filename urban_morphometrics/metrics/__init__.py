@@ -34,11 +34,28 @@ def register(name: str):
 # Keep this list in alphabetical order; add new modules here as they are implemented.
 def _load_metrics():
     from urban_morphometrics.metrics import (  # noqa: F401
+        # Dimension metrics (step 5)
         courtyard_area,
         floor_area,
         longest_axis_length,
         perimeter_wall,
         volume,
+        # Shape metrics (step 6)
+        centroid_corner_distance,
+        circular_compactness,
+        compactness_weighted_axis,
+        convexity,
+        corners,
+        courtyard_index,
+        elongation,
+        equivalent_rectangular_index,
+        facade_ratio,
+        form_factor,
+        fractal_dimension,
+        rectangularity,
+        shape_index,
+        square_compactness,
+        squareness,
     )
 
 _load_metrics()

@@ -85,6 +85,7 @@ def compute_urban_morphometrics(
     equidistant_crs: str = "EPSG:4087",
     conformal_crs: str = "EPSG:3857",
     debug: bool = False,
+    use_cache: bool = True,
 ) -> None:
     """Compute urban morphology metrics for a study area from OSM data.
 
@@ -102,6 +103,8 @@ def compute_urban_morphometrics(
         equidistant_crs: CRS string for equidistant projections.
         conformal_crs: CRS string for conformal projections.
         debug: When True, dump intermediate layers to the debug folder.
+        use_cache: When False, metric results are always recomputed even if a cached
+            ``_metrics.parquet`` exists. The cache is also not written.
     """
     output_folder = Path(output_folder)
 
@@ -146,7 +149,7 @@ def compute_urban_morphometrics(
         cell_cache_dir = cache_dir / str(region_id)
         metrics_cache = cell_cache_dir / "_metrics.parquet"
 
-        if metrics_cache.exists():
+        if use_cache and metrics_cache.exists():
             metric_row = pd.read_parquet(metrics_cache).iloc[0].to_dict()
         else:
             ctx = CellContext(
@@ -160,7 +163,8 @@ def compute_urban_morphometrics(
                 cache_dir=cell_cache_dir,
             )
             metric_row = compute_metrics(ctx, metrics, num_quantiles)
-            pd.DataFrame([metric_row]).to_parquet(metrics_cache)
+            if use_cache:
+                pd.DataFrame([metric_row]).to_parquet(metrics_cache)
 
         rows.append({"region_id": region_id, "geometry": row.geometry, **metric_row})
 
@@ -186,6 +190,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--equidistant-crs", default="EPSG:4087", help="Equidistant CRS (default: EPSG:4087).")
     p.add_argument("--conformal-crs", default="EPSG:3857", help="Conformal CRS (default: EPSG:3857).")
     p.add_argument("--debug", action="store_true", help="Dump intermediate layers to the debug folder.")
+    p.add_argument("--no-cache", action="store_true", help="Recompute metrics for every cell, ignoring and not writing the cache.")
     return p
 
 
@@ -219,6 +224,7 @@ def main() -> None:
             equidistant_crs=args.equidistant_crs,
             conformal_crs=args.conformal_crs,
             debug=args.debug,
+            use_cache=not args.no_cache,
         )
     except (FileNotFoundError, ValueError) as e:
         log.error("%s", e)

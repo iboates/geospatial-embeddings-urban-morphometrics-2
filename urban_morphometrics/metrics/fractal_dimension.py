@@ -1,0 +1,34 @@
+"""Fractal dimension metric.
+
+2 * log(perimeter/4) / log(area). ~1.0 = very simple (square); 1.05–1.15 =
+moderately articulated; >1.20 = complex/fragmented. Computed twice:
+- `fractal_dimension`: per raw individual building
+- `fractal_dimension_joined`: per dissolved structure (touching buildings merged)
+"""
+
+import pandas as pd
+import momepy
+
+from urban_morphometrics.cell_context import CellContext
+from urban_morphometrics.metrics import register
+from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics._utils import dissolve_touching
+
+
+@register("fractal_dimension")
+def compute(ctx: CellContext, num_quantiles: int) -> dict:
+    """2·log(perimeter/4)/log(area) per raw building and per dissolved structure."""
+    b = ctx.buildings_ea
+    empty = pd.Series(dtype=float)
+    if b.empty:
+        return {
+            **aggregate_series(empty, "fractal_dimension", num_quantiles),
+            **aggregate_series(empty, "fractal_dimension_joined", num_quantiles),
+        }
+
+    result = aggregate_series(momepy.fractal_dimension(b), "fractal_dimension", num_quantiles)
+
+    dissolved = dissolve_touching(b)
+    result.update(aggregate_series(momepy.fractal_dimension(dissolved), "fractal_dimension_joined", num_quantiles))
+
+    return result
