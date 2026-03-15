@@ -15,6 +15,7 @@ from shapely.geometry import shape
 
 from urban_morphometrics.constants import VEHICLE_HIGHWAY_TYPES, PEDESTRIAN_HIGHWAY_TYPES
 from urban_morphometrics.height import resolve_heights
+from urban_morphometrics.metric_config import MetricConfig
 from urban_morphometrics.oneway import apply_oneway
 from urban_morphometrics.osm_loader import OsmData
 
@@ -48,6 +49,7 @@ class CellContext:
         equidistant_crs: str,
         conformal_crs: str,
         cache_dir: Path,
+        config: "MetricConfig | None" = None,
     ):
         self.region_id = region_id
         self._cell_geometry = cell_geometry
@@ -58,6 +60,7 @@ class CellContext:
         self._cf_crs = conformal_crs
         self._cache_dir = cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
+        self.config = config if config is not None else MetricConfig()
 
     # ------------------------------------------------------------------
     # Cache helpers
@@ -281,3 +284,108 @@ class CellContext:
     def focal_plus_neighbourhood_pedestrian_highways(self) -> gpd.GeoDataFrame:
         """Focal and neighbourhood pedestrian highways combined, in equal-area CRS."""
         return pd.concat([self.pedestrian_highways_ea, self.neighbourhood_pedestrian_highways])
+
+    # ------------------------------------------------------------------
+    # Shared spatial graphs (in-memory only; not persisted to Parquet)
+    # Built on focal + neighbourhood buildings to avoid edge effects.
+    # Returned as None when there are too few buildings to form a graph.
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def knn_graph(self):
+        """KNN graph on focal + neighbourhood buildings (k from MetricConfig.knn_k).
+
+        Returns None if there are fewer buildings than k+1, in which case metrics
+        that depend on this graph return all-NaN aggregations.
+        coplanar='jitter' handles the rare case of coincident building centroids.
+        """
+        from libpysal.graph import Graph
+
+        all_b = self.focal_plus_neighbourhood_buildings
+        if len(all_b) < 2:
+            return None
+        k = min(self.config.knn_k, len(all_b) - 1)
+        return Graph.build_knn(all_b.centroid, k=k, coplanar="jitter")
+
+    @cached_property
+    def delaunay_graph(self):
+        """Delaunay triangulation graph on focal + neighbourhood buildings.
+
+        Returns None if there are fewer than 3 buildings (minimum for a triangulation).
+        coplanar='jitter' handles coincident centroids.
+        """
+        from libpysal.graph import Graph
+
+        all_b = self.focal_plus_neighbourhood_buildings
+        if len(all_b) < 3:
+            return None
+        return Graph.build_triangulation(all_b.centroid, method="delaunay", coplanar="jitter")
+
+    @cached_property
+    def contiguity_graph(self):
+        """Rook contiguity graph on focal + neighbourhood buildings.
+
+        Buildings that share a wall segment (or touch within tolerance) are
+        considered rook-contiguous. Returns None for empty building sets.
+        """
+        from libpysal.graph import Graph
+
+        all_b = self.focal_plus_neighbourhood_buildings
+        if all_b.empty:
+            return None
+        return Graph.build_contiguity(all_b, rook=True)
+
+    @cached_property
+    def tessellation(self):
+        """Morphological (Voronoi) tessellation on focal + neighbourhood buildings.
+
+        Parameters (clip, shrink, segment) come from MetricConfig. The result is
+        persisted to tessellation.parquet alongside the other cached layers so it
+        is not recomputed on subsequent pipeline runs. Returns None if there are
+        too few buildings or tessellation fails on degenerate geometry (no file
+        is written in that case).
+        The tessellation index matches focal_plus_neighbourhood_buildings.index,
+        allowing downstream metrics to filter results to focal buildings via reindex.
+        """
+        import momepy
+
+        path = self._cache_path("tessellation")
+        if path.exists():
+            return gpd.read_parquet(path)
+
+        all_b = self.focal_plus_neighbourhood_buildings
+        if len(all_b) < 2:
+            return None
+        try:
+            clip = momepy.buffered_limit(
+                all_b,
+                buffer=self.config.tessellation_buffer,
+                min_buffer=self.config.tessellation_min_buffer,
+                max_buffer=self.config.tessellation_max_buffer
+            )
+            result = momepy.morphological_tessellation(
+                all_b,
+                clip=clip,
+                shrink=self.config.tessellation_shrink,
+                segment=self.config.tessellation_segment,
+            )
+        except Exception:
+            log.warning(
+                "Morphological tessellation failed for region %s", self.region_id, exc_info=True
+            )
+            return None
+        result.to_parquet(path)
+        return result
+
+    @cached_property
+    def tessellation_queen_graph(self):
+        """Queen contiguity graph on the morphological tessellation.
+
+        Returns None if tessellation is unavailable or empty.
+        """
+        from libpysal.graph import Graph
+
+        tess = self.tessellation
+        if tess is None or tess.empty:
+            return None
+        return Graph.build_contiguity(tess, rook=False)

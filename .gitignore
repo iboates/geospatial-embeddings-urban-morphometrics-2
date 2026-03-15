@@ -6,3 +6,5 @@
 *__pycache__*
 *.pbf
 files/
+*.gpkg
+*.parquet

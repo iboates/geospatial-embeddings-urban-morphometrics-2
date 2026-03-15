@@ -9,6 +9,16 @@ def run_main():
     regionalizer = H3Regionalizer(resolution=9)
     regions_gdf = regionalizer.transform(region_gdf)
     print(f"Number of cells: {len(regions_gdf)}")
+    
+    metric_config = {
+        "knn_k": 15,
+        "tessellation_buffer": 5,
+        "tessellation_min_buffer": 0,
+        "tessellation_max_buffer": 10,
+        "tessellation_shrink": 0.4,
+        "tessellation_segment": 0.5,
+        "street_alignment_max_distance": 500.0
+    }
 
     compute_urban_morphometrics(
         study_area_gdf=regions_gdf,
@@ -16,9 +26,11 @@ def run_main():
         run_name="my_run2",
         neighbourhood_distance=200,
         num_quantiles=4,
+        metric_config=metric_config,
         # metrics=["volume", "floor_area"],
         debug=True,
-        output_folder="/mnt/c/Users/Isaac/Downloads/urban_morphometrics"
+        output_folder="/mnt/c/Users/Isaac/Downloads/urban_morphometrics",
+        use_cache=False
     )
 
 if __name__ == "__main__":

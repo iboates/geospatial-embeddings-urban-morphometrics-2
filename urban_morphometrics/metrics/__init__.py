@@ -56,6 +56,16 @@ def _load_metrics():
         shape_index,
         square_compactness,
         squareness,
+        # Distribution metrics (step 7)
+        alignment,
+        building_adjacency,
+        cell_alignment,
+        mean_interbuilding_distance,
+        neighbor_distance,
+        neighbors,
+        orientation,
+        shared_walls,
+        street_alignment,
     )
 
 _load_metrics()

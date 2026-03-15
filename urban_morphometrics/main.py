@@ -86,6 +86,7 @@ def compute_urban_morphometrics(
     conformal_crs: str = "EPSG:3857",
     debug: bool = False,
     use_cache: bool = True,
+    metric_config: "dict | MetricConfig | None" = None,
 ) -> None:
     """Compute urban morphology metrics for a study area from OSM data.
 
@@ -114,6 +115,16 @@ def compute_urban_morphometrics(
     pbf_path = _resolve_pbf(pbf_path, output_folder)
     metrics = metrics or ["all"]
 
+    from urban_morphometrics.metric_config import MetricConfig
+    if metric_config is None:
+        cfg = MetricConfig()
+    elif isinstance(metric_config, dict):
+        cfg = MetricConfig.from_dict(metric_config)
+    elif isinstance(metric_config, MetricConfig):
+        cfg = metric_config
+    else:
+        raise TypeError(f"metric_config must be a dict, MetricConfig, or None; got {type(metric_config).__name__}")
+
     run_dir = output_folder / run_name
     cache_dir = run_dir / "cache"
     results_dir = run_dir / "results"
@@ -135,6 +146,7 @@ def compute_urban_morphometrics(
     log.info("Conformal CRS: %s", conformal_crs)
     log.info("Debug: %s", debug)
     log.info("Metrics (%d): %s", len(metrics), ", ".join(metrics))
+    log.info("Metric config: %s", cfg.to_dict())
 
     osm_data = load_osm_data(pbf_path, study_area_gdf)
 
@@ -161,6 +173,7 @@ def compute_urban_morphometrics(
                 equidistant_crs=equidistant_crs,
                 conformal_crs=conformal_crs,
                 cache_dir=cell_cache_dir,
+                config=cfg,
             )
             metric_row = compute_metrics(ctx, metrics, num_quantiles)
             if use_cache:
@@ -191,6 +204,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--conformal-crs", default="EPSG:3857", help="Conformal CRS (default: EPSG:3857).")
     p.add_argument("--debug", action="store_true", help="Dump intermediate layers to the debug folder.")
     p.add_argument("--no-cache", action="store_true", help="Recompute metrics for every cell, ignoring and not writing the cache.")
+    p.add_argument(
+        "--metric-config",
+        metavar="PATH",
+        help="Path to a JSON file with metric configuration parameters (knn_k, tessellation_clip, etc.).",
+    )
     return p
 
 
@@ -211,6 +229,12 @@ def main() -> None:
 
     metrics = None if args.metrics.strip().lower() == "all" else [m.strip() for m in args.metrics.split(",") if m.strip()]
 
+    metric_config = None
+    if args.metric_config:
+        import json
+        with open(args.metric_config) as f:
+            metric_config = json.load(f)
+
     try:
         compute_urban_morphometrics(
             study_area_gdf=study_area_gdf,
@@ -225,6 +249,7 @@ def main() -> None:
             conformal_crs=args.conformal_crs,
             debug=args.debug,
             use_cache=not args.no_cache,
+            metric_config=metric_config,
         )
     except (FileNotFoundError, ValueError) as e:
         log.error("%s", e)
