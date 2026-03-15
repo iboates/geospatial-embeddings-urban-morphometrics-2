@@ -90,6 +90,10 @@ class CellContext:
         return self._cell_series_wgs84.to_crs(self._ea_crs).iloc[0]
 
     @cached_property
+    def _cell_ed(self):
+        return self._cell_series_wgs84.to_crs(self._ed_crs).iloc[0]
+
+    @cached_property
     def _cell_buffer_wgs84(self):
         """Cell buffered by neighbourhood_distance, back in WGS84."""
         buffer_ea = gpd.GeoSeries([self._cell_ea], crs=self._ea_crs).buffer(
@@ -389,3 +393,34 @@ class CellContext:
         if tess is None or tess.empty:
             return None
         return Graph.build_contiguity(tess, rook=False)
+
+    # ------------------------------------------------------------------
+    # Street network graphs (in-memory only; not persisted to Parquet)
+    # Built from focal + neighbourhood highways in equidistant CRS so
+    # that edge lengths are accurate for distance-based metrics.
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def vehicle_graph(self):
+        """Directed primal NetworkX graph of focal + neighbourhood vehicle highways.
+
+        Nodes are street intersections; edges are segments with length ('mm_len')
+        and direction respecting the 'oneway' column. Returns None if there are
+        no vehicle streets in the neighbourhood.
+        """
+        from urban_morphometrics.street_graph import build_vehicle_graph
+
+        streets = self.focal_plus_neighbourhood_vehicle_highways.to_crs(self._ed_crs)
+        return build_vehicle_graph(streets)
+
+    @cached_property
+    def pedestrian_graph(self):
+        """Undirected primal NetworkX graph of focal + neighbourhood pedestrian highways.
+
+        All segments are treated as bidirectional. Returns None if there are no
+        pedestrian streets in the neighbourhood.
+        """
+        from urban_morphometrics.street_graph import build_pedestrian_graph
+
+        streets = self.focal_plus_neighbourhood_pedestrian_highways.to_crs(self._ed_crs)
+        return build_pedestrian_graph(streets)
