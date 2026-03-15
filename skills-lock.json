@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "executing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "computedHash": "2f709d1a2c7564f8ce6a9bb707e7f5451117ba80f8e8e2302662c29bc61246a6"
+    },
+    "geopandas": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "623822b9b96834e40d10a5b4496d0928dee7ed5a63c2fa7955b5987e9c2fdd92"
+    }
+  }
+}
