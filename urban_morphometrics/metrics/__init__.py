@@ -66,6 +66,10 @@ def _load_metrics():
         orientation,
         shared_walls,
         street_alignment,
+        # Intensity and street relationship metrics (step 8)
+        courtyards,
+        nearest_street_distance,
+        street_profile,
     )
 
 _load_metrics()
