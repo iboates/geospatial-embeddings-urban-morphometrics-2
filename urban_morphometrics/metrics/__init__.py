@@ -30,6 +30,20 @@ def register(name: str):
     return decorator
 
 
+# Import all metric modules to trigger @register decorators.
+# Keep this list in alphabetical order; add new modules here as they are implemented.
+def _load_metrics():
+    from urban_morphometrics.metrics import (  # noqa: F401
+        courtyard_area,
+        floor_area,
+        longest_axis_length,
+        perimeter_wall,
+        volume,
+    )
+
+_load_metrics()
+
+
 def compute_metrics(
     ctx: CellContext,
     metric_names: list[str],

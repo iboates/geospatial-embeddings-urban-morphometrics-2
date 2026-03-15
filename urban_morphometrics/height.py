@@ -55,7 +55,8 @@ def _parse_levels_value(val) -> float | None:
 def resolve_heights(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Add a resolved numeric 'height' column to a buildings GeoDataFrame.
 
-    Mutates a copy of the input. Resolution priority:
+    Returns the input unchanged (with an added float 'height' column) when empty.
+    Resolution priority:
       1. Existing 'height' column (parsed to float metres)
       2. 'building:levels' column * 3 m/storey
       3. Default 6 m
@@ -68,18 +69,19 @@ def resolve_heights(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
     buildings = buildings.copy()
 
+    if buildings.empty:
+        buildings["height"] = pd.Series(dtype=float)
+        return buildings
+
     if "height" in buildings.columns:
         buildings["height"] = buildings["height"].apply(_parse_height_value)
     else:
         buildings["height"] = np.nan
 
     if _LEVELS_COL in buildings.columns:
-        levels = buildings[_LEVELS_COL].apply(_parse_levels_value)
-        missing = buildings["height"].isna()
-        has_levels = levels.notna()
-        buildings.loc[missing & has_levels, "height"] = (
-            levels[missing & has_levels] * _METRES_PER_STOREY
-        )
+        levels = buildings[_LEVELS_COL].apply(_parse_levels_value).rename(None)
+        height_from_levels = levels * _METRES_PER_STOREY
+        buildings["height"] = pd.to_numeric(buildings["height"], errors="coerce").fillna(height_from_levels)
 
     buildings["height"] = buildings["height"].fillna(_DEFAULT_HEIGHT_M)
     return buildings
