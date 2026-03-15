@@ -28,7 +28,7 @@ def _compute(graph, suffix: str) -> dict:
             f"proportion_four_{suffix}": float("nan"),
             f"proportion_dead_{suffix}": float("nan"),
         }
-    momepy.node_degree(graph)
+    graph = momepy.node_degree(graph)
     result = momepy.proportion(
         graph,
         radius=None,

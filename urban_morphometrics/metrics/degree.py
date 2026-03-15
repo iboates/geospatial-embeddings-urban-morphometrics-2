@@ -22,7 +22,7 @@ def _compute(graph, suffix, cell_geom, num_quantiles) -> dict:
     empty = aggregate_series(pd.Series(dtype=float), prefix, num_quantiles)
     if graph is None:
         return empty
-    momepy.node_degree(graph)
+    graph = momepy.node_degree(graph)
     values = focal_nodes_series(graph, "degree", cell_geom)
     return aggregate_series(values, prefix, num_quantiles)
 

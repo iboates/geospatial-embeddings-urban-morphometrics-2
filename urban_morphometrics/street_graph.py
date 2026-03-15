@@ -73,18 +73,25 @@ def nodes_gdf(graph):
 def focal_nodes_series(graph, attr, cell_geom) -> pd.Series:
     """Extract a per-node metric attribute for nodes within the focal cell.
 
-    Calls momepy.nx_to_gdf to materialise all node attributes, then spatially
-    filters to nodes whose Point geometry lies within cell_geom (in the same
-    CRS as the graph). Returns an empty Series if no focal nodes are found or
-    the attribute is absent.
+    Reads node data directly from the graph (avoids nx_to_gdf) and spatially
+    filters to nodes whose (x, y) position lies within cell_geom (in the same
+    CRS as the graph). Returns an empty Series if no nodes carry the attribute
+    or none fall within the cell.
+
+    momepy graph functions (node_degree, clustering, etc.) return a modified
+    graph rather than mutating in place, so callers must pass the graph
+    returned by the momepy function, not the original input.
 
     Args:
-        graph:      NetworkX graph with the attribute already set on nodes.
+        graph:      NetworkX graph returned by a momepy metric function.
         attr:       Node attribute name to extract (e.g. 'degree', 'closeness').
         cell_geom:  Shapely geometry in the same projected CRS as the graph nodes.
     """
-    nodes = nodes_gdf(graph)
-    if attr not in nodes.columns:
-        return pd.Series(dtype=float)
-    mask = nodes.geometry.within(cell_geom)
-    return nodes.loc[mask, attr].reset_index(drop=True)
+    from shapely.geometry import Point
+
+    values = [
+        data[attr]
+        for _, data in graph.nodes(data=True)
+        if attr in data and cell_geom.contains(Point(data["x"], data["y"]))
+    ]
+    return pd.Series(values, dtype=float)

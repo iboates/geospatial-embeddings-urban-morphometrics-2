@@ -24,8 +24,8 @@ def _compute(graph, suffix, cell_geom, radius, num_quantiles) -> dict:
     empty = aggregate_series(pd.Series(dtype=float), prefix, num_quantiles)
     if graph is None:
         return empty
-    momepy.node_degree(graph)
-    momepy.mean_node_degree(graph, radius=radius, verbose=False)
+    graph = momepy.node_degree(graph)
+    graph = momepy.mean_node_degree(graph, radius=radius, verbose=False)
     values = focal_nodes_series(graph, "mean_nd", cell_geom)
     return aggregate_series(values, prefix, num_quantiles)
 

@@ -157,29 +157,39 @@ def compute_urban_morphometrics(
         osm_data.landuse.to_file(debug_dir / "landuse.gpkg", driver="GPKG")
 
     rows = []
-    for region_id, row in tqdm(study_area_gdf.iterrows(), total=len(study_area_gdf), desc="Cells", unit="cell"):
+    n_total = len(study_area_gdf)
+    n_failed = 0
+    for region_id, row in tqdm(study_area_gdf.iterrows(), total=n_total, desc="Cells", unit="cell"):
         cell_cache_dir = cache_dir / str(region_id)
         metrics_cache = cell_cache_dir / "_metrics.parquet"
 
-        if use_cache and metrics_cache.exists():
-            metric_row = pd.read_parquet(metrics_cache).iloc[0].to_dict()
-        else:
-            ctx = CellContext(
-                region_id=region_id,
-                cell_geometry=row.geometry,
-                osm_data=osm_data,
-                neighbourhood_distance=neighbourhood_distance,
-                equal_area_crs=equal_area_crs,
-                equidistant_crs=equidistant_crs,
-                conformal_crs=conformal_crs,
-                cache_dir=cell_cache_dir,
-                config=cfg,
-            )
-            metric_row = compute_metrics(ctx, metrics, num_quantiles)
-            if use_cache:
-                pd.DataFrame([metric_row]).to_parquet(metrics_cache)
+        try:
+            if use_cache and metrics_cache.exists():
+                metric_row = pd.read_parquet(metrics_cache).iloc[0].to_dict()
+            else:
+                ctx = CellContext(
+                    region_id=region_id,
+                    cell_geometry=row.geometry,
+                    osm_data=osm_data,
+                    neighbourhood_distance=neighbourhood_distance,
+                    equal_area_crs=equal_area_crs,
+                    equidistant_crs=equidistant_crs,
+                    conformal_crs=conformal_crs,
+                    cache_dir=cell_cache_dir,
+                    config=cfg,
+                )
+                metric_row = compute_metrics(ctx, metrics, num_quantiles)
+                if use_cache:
+                    pd.DataFrame([metric_row]).to_parquet(metrics_cache)
+        except Exception:
+            log.warning("Cell %s failed — skipping", region_id, exc_info=True)
+            n_failed += 1
+            continue
 
         rows.append({"region_id": region_id, "geometry": row.geometry, **metric_row})
+
+    if n_failed:
+        log.warning("%d / %d cells failed and were excluded from results", n_failed, n_total)
 
     results_gdf = gpd.GeoDataFrame(rows, crs=study_area_gdf.crs).set_index("region_id")
     out_path = results_dir / "metrics.gpkg"

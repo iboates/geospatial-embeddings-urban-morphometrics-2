@@ -18,7 +18,7 @@ from urban_morphometrics.metrics import register
 def _compute(graph) -> float:
     if graph is None or graph.number_of_nodes() < 2:
         return float("nan")
-    momepy.node_degree(graph)
+    graph = momepy.node_degree(graph)
     return float(momepy.cds_length(graph, radius=None))
 
 
