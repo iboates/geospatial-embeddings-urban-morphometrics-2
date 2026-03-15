@@ -8,7 +8,9 @@ import urllib.request
 from pathlib import Path
 
 import geopandas as gpd
+from tqdm import tqdm
 
+from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.osm_loader import load_osm_data
 
 logging.basicConfig(
@@ -37,9 +39,8 @@ def _resolve_pbf(pbf: str | Path, output_folder: Path) -> Path:
         if local_path.exists():
             log.info("Using cached PBF: %s", local_path)
         else:
-            log.info("Downloading PBF from %s -> %s", pbf, local_path)
+            log.info("Downloading PBF from %s", pbf)
             _download_with_progress(pbf, local_path)
-            log.info("Download complete: %s", local_path)
         return local_path
 
     local_path = Path(pbf)
@@ -51,19 +52,19 @@ def _resolve_pbf(pbf: str | Path, output_folder: Path) -> Path:
 def _download_with_progress(url: str, dest: Path) -> None:
     tmp = dest.with_suffix(".part")
     try:
-        with urllib.request.urlopen(url) as response, tmp.open("wb") as f:
-            total = int(response.headers.get("Content-Length", 0))
-            downloaded = 0
+        with urllib.request.urlopen(url) as response:
+            total = int(response.headers.get("Content-Length", 0)) or None
             chunk = 1024 * 1024  # 1 MB
-            while True:
-                buf = response.read(chunk)
-                if not buf:
-                    break
-                f.write(buf)
-                downloaded += len(buf)
-                if total:
-                    pct = downloaded / total * 100
-                    log.info("  %.1f%% (%d / %d MB)", pct, downloaded // 1024 // 1024, total // 1024 // 1024)
+            with tmp.open("wb") as f, tqdm(
+                total=total, unit="B", unit_scale=True, unit_divisor=1024,
+                desc=dest.name, leave=True,
+            ) as bar:
+                while True:
+                    buf = response.read(chunk)
+                    if not buf:
+                        break
+                    f.write(buf)
+                    bar.update(len(buf))
         tmp.rename(dest)
     except Exception:
         tmp.unlink(missing_ok=True)
@@ -137,6 +138,19 @@ def compute_urban_morphometrics(
         osm_data.buildings.to_file(debug_dir / "buildings.gpkg", driver="GPKG")
         osm_data.highways.to_file(debug_dir / "highways.gpkg", driver="GPKG")
         osm_data.landuse.to_file(debug_dir / "landuse.gpkg", driver="GPKG")
+
+    for region_id, row in tqdm(study_area_gdf.iterrows(), total=len(study_area_gdf), desc="Cells", unit="cell"):
+        cell_cache_dir = cache_dir / str(region_id)
+        CellContext(
+            region_id=region_id,
+            cell_geometry=row.geometry,
+            osm_data=osm_data,
+            neighbourhood_distance=neighbourhood_distance,
+            equal_area_crs=equal_area_crs,
+            equidistant_crs=equidistant_crs,
+            conformal_crs=conformal_crs,
+            cache_dir=cell_cache_dir,
+        )
 
 
 def _build_parser() -> argparse.ArgumentParser:
