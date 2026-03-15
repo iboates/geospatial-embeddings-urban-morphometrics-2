@@ -23,6 +23,7 @@ import logging
 import warnings
 
 import momepy
+import pandas as pd
 
 log = logging.getLogger(__name__)
 
@@ -62,22 +63,28 @@ def nodes_gdf(graph):
     """Extract node positions and attributes from a momepy primal graph as a GeoDataFrame.
 
     Returns a GeoDataFrame with one row per node, a Point geometry column, and any
-    metric attributes that have been added to the graph by momepy metric functions.
+    metric attributes added to the graph by momepy metric functions.
+    momepy.nx_to_gdf always returns a (nodes, edges) tuple; we take only nodes.
     """
-    nodes, _ = momepy.nx_to_gdf(graph, points=True, lines=False)
+    nodes, _ = momepy.nx_to_gdf(graph)
     return nodes
 
 
-def focal_node_ids(graph, cell_geom):
-    """Return the list of node IDs (graph node keys) that lie within cell_geom.
+def focal_nodes_series(graph, attr, cell_geom) -> pd.Series:
+    """Extract a per-node metric attribute for nodes within the focal cell.
 
-    cell_geom must be a Shapely geometry in the same CRS as the graph nodes.
-    Node positions are stored as 'x'/'y' attributes on each node by momepy.gdf_to_nx.
+    Calls momepy.nx_to_gdf to materialise all node attributes, then spatially
+    filters to nodes whose Point geometry lies within cell_geom (in the same
+    CRS as the graph). Returns an empty Series if no focal nodes are found or
+    the attribute is absent.
+
+    Args:
+        graph:      NetworkX graph with the attribute already set on nodes.
+        attr:       Node attribute name to extract (e.g. 'degree', 'closeness').
+        cell_geom:  Shapely geometry in the same projected CRS as the graph nodes.
     """
-    from shapely.geometry import Point
-
-    return [
-        node
-        for node, data in graph.nodes(data=True)
-        if cell_geom.contains(Point(data["x"], data["y"]))
-    ]
+    nodes = nodes_gdf(graph)
+    if attr not in nodes.columns:
+        return pd.Series(dtype=float)
+    mask = nodes.geometry.within(cell_geom)
+    return nodes.loc[mask, attr].reset_index(drop=True)

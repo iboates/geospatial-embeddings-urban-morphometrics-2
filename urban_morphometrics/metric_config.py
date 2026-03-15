@@ -48,6 +48,24 @@ class MetricConfig:
         street for the street_alignment metric. Buildings with no street within
         this radius get a NaN alignment value. Set to null in JSON for no limit.
         Default: 500.0.
+    network_subgraph_radius:
+        Hop radius used when computing per-node subgraph metrics on the street
+        network: meshedness, gamma, edge_node_ratio, cyclomatic, and
+        mean_node_degree. Each node's metric is computed within its local
+        subgraph of this many hops. Larger values capture wider context but
+        increase computation time roughly quadratically.
+        Default: 5.
+    street_profile_distance:
+        Spacing (metres) between the perpendicular ticks cast along each street
+        segment when computing the street_profile metric. Smaller values give
+        a denser, more precise profile at the cost of speed.
+        Default: 10.
+    street_profile_tick_length:
+        Length (metres) of each perpendicular tick cast from the street
+        centreline when computing the street_profile metric. Should be at
+        least as wide as the widest street canyon expected; ticks that reach
+        no building on one side count as open.
+        Default: 50.
     """
 
     knn_k: int = 15
@@ -57,6 +75,9 @@ class MetricConfig:
     tessellation_shrink: float = 0.4
     tessellation_segment: float = 0.5
     street_alignment_max_distance: float | None = 500.0
+    network_subgraph_radius: int = 5
+    street_profile_distance: float = 10.0
+    street_profile_tick_length: float = 50.0
 
     @classmethod
     def from_dict(cls, d: dict) -> "MetricConfig":

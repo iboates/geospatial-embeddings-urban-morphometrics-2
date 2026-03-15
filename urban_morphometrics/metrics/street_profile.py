@@ -12,6 +12,9 @@ Requires neighbourhood context so streets near the cell boundary sample building
 across the boundary correctly. Heights are resolved for all buildings (focal and
 neighbourhood) using the same OSM-tag priority logic as the volume metric:
 height tag → building:levels × 3 → 6 m default.
+
+Tick spacing and length are controlled by MetricConfig.street_profile_distance
+(default: 10 m) and MetricConfig.street_profile_tick_length (default: 50 m).
 """
 
 import pandas as pd
@@ -43,7 +46,13 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     all_b_with_height = resolve_heights(all_b)
     height = all_b_with_height["height"]
 
-    profile = momepy.street_profile(streets, all_b_with_height, height=height)
+    profile = momepy.street_profile(
+        streets,
+        all_b_with_height,
+        height=height,
+        distance=ctx.config.street_profile_distance,
+        tick_length=ctx.config.street_profile_tick_length,
+    )
 
     focal_profile = profile.reindex(focal_streets.index)
 

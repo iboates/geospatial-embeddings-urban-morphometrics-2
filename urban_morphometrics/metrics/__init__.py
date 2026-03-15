@@ -70,6 +70,23 @@ def _load_metrics():
         courtyards,
         nearest_street_distance,
         street_profile,
+        # Street connectivity — per-node metrics (step 10)
+        betweenness_centrality,
+        closeness_centrality,
+        clustering,
+        cyclomatic,
+        degree,
+        edge_node_ratio,
+        gamma,
+        mean_node_degree,
+        mean_node_dist,
+        meshedness,
+        straightness_centrality,
+        # Street connectivity — global graph-level metrics (step 11)
+        cds_length_total,
+        gamma_global,
+        meshedness_global,
+        proportion,
     )
 
 _load_metrics()
