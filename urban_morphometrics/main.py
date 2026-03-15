@@ -1,0 +1,188 @@
+"""Urban morphometrics pipeline — importable function and CLI entry point."""
+
+import argparse
+import logging
+import sys
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+import geopandas as gpd
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+
+def _resolve_pbf(pbf: str | Path, output_folder: Path) -> Path:
+    """Return a local path to the PBF file, downloading it first if a URL is given.
+
+    Downloaded files are cached in {output_folder}/pbf_cache/ keyed by filename.
+    Re-specifying the same URL will reuse the cached file without re-downloading.
+    """
+    pbf = str(pbf)
+    parsed = urllib.parse.urlparse(pbf)
+    if parsed.scheme in ("http", "https"):
+        filename = Path(parsed.path).name
+        if not filename.endswith(".pbf"):
+            raise ValueError(f"URL does not point to a .pbf file: {pbf}")
+        pbf_cache_dir = output_folder / "pbf_cache"
+        pbf_cache_dir.mkdir(parents=True, exist_ok=True)
+        local_path = pbf_cache_dir / filename
+        if local_path.exists():
+            log.info("Using cached PBF: %s", local_path)
+        else:
+            log.info("Downloading PBF from %s -> %s", pbf, local_path)
+            _download_with_progress(pbf, local_path)
+            log.info("Download complete: %s", local_path)
+        return local_path
+
+    local_path = Path(pbf)
+    if not local_path.exists():
+        raise FileNotFoundError(f"PBF file not found: {local_path}")
+    return local_path
+
+
+def _download_with_progress(url: str, dest: Path) -> None:
+    tmp = dest.with_suffix(".part")
+    try:
+        with urllib.request.urlopen(url) as response, tmp.open("wb") as f:
+            total = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunk = 1024 * 1024  # 1 MB
+            while True:
+                buf = response.read(chunk)
+                if not buf:
+                    break
+                f.write(buf)
+                downloaded += len(buf)
+                if total:
+                    pct = downloaded / total * 100
+                    log.info("  %.1f%% (%d / %d MB)", pct, downloaded // 1024 // 1024, total // 1024 // 1024)
+        tmp.rename(dest)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def compute_urban_morphometrics(
+    study_area_gdf: gpd.GeoDataFrame,
+    pbf_path: str | Path,
+    run_name: str,
+    output_folder: str | Path,
+    neighbourhood_distance: float = 500.0,
+    num_quantiles: int = 10,
+    metrics: list[str] | None = None,
+    equal_area_crs: str = "EPSG:3395",
+    equidistant_crs: str = "EPSG:4087",
+    conformal_crs: str = "EPSG:3857",
+    debug: bool = False,
+) -> None:
+    """Compute urban morphology metrics for a study area from OSM data.
+
+    Args:
+        study_area_gdf: GeoDataFrame of polygons in WGS84 with 'region_id' as its index.
+        pbf_path: Path or URL to a .pbf OSM dump file. URLs are downloaded once and
+            cached in {output_folder}/pbf_cache/ for reuse across runs.
+        run_name: Name of this pipeline run (used for output and cache folders).
+        output_folder: Root directory for all outputs.
+        neighbourhood_distance: Buffer distance (metres) around each cell used
+            to gather neighbourhood context for edge-sensitive metrics.
+        num_quantiles: Number of quantile bands to compute for per-feature metrics.
+        metrics: List of metric names to compute. None or empty list means all metrics.
+        equal_area_crs: CRS string for equal-area projections.
+        equidistant_crs: CRS string for equidistant projections.
+        conformal_crs: CRS string for conformal projections.
+        debug: When True, dump intermediate layers to the debug folder.
+    """
+    output_folder = Path(output_folder)
+
+    if study_area_gdf.index.name != "region_id":
+        raise ValueError("study_area_gdf must have 'region_id' as its index")
+
+    pbf_path = _resolve_pbf(pbf_path, output_folder)
+    metrics = metrics or ["all"]
+
+    run_dir = output_folder / run_name
+    cache_dir = run_dir / "cache"
+    results_dir = run_dir / "results"
+    debug_dir = run_dir / "debug"
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    if debug:
+        debug_dir.mkdir(parents=True, exist_ok=True)
+
+    log.info("Run: %s", run_name)
+    log.info("Study area: %d cells", len(study_area_gdf))
+    log.info("PBF: %s", pbf_path)
+    log.info("Output: %s", run_dir)
+    log.info("Neighbourhood distance: %sm", neighbourhood_distance)
+    log.info("Quantiles: %s", num_quantiles)
+    log.info("Equal-area CRS: %s", equal_area_crs)
+    log.info("Equidistant CRS: %s", equidistant_crs)
+    log.info("Conformal CRS: %s", conformal_crs)
+    log.info("Debug: %s", debug)
+    log.info("Metrics (%d): %s", len(metrics), ", ".join(metrics))
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="urban-morphometrics",
+        description="Compute urban morphology metrics for a study area from OSM data.",
+    )
+    p.add_argument("study_area_path", help="Path to study area file (GeoPackage/GeoJSON/Shapefile) in WGS84 with 'region_id' column or index.")
+    p.add_argument("pbf_path", help="Path or URL to a .pbf OSM dump file. URLs are downloaded and cached in {output_folder}/pbf_cache/.")
+    p.add_argument("run_name", help="Name of this pipeline run.")
+    p.add_argument("output_folder", help="Root directory for all outputs.")
+    p.add_argument("--neighbourhood-distance", type=float, default=500.0, metavar="METRES", help="Buffer distance around each cell for neighbourhood context (default: 500).")
+    p.add_argument("--num-quantiles", type=int, default=10, metavar="N", help="Number of quantile bands for per-feature metrics (default: 10).")
+    p.add_argument("--metrics", default="all", help="Comma-separated metric names, or 'all' (default: all).")
+    p.add_argument("--equal-area-crs", default="EPSG:3395", help="Equal-area CRS (default: EPSG:3395).")
+    p.add_argument("--equidistant-crs", default="EPSG:4087", help="Equidistant CRS (default: EPSG:4087).")
+    p.add_argument("--conformal-crs", default="EPSG:3857", help="Conformal CRS (default: EPSG:3857).")
+    p.add_argument("--debug", action="store_true", help="Dump intermediate layers to the debug folder.")
+    return p
+
+
+def main() -> None:
+    args = _build_parser().parse_args()
+
+    study_area_path = Path(args.study_area_path)
+    if not study_area_path.exists():
+        log.error("Study area file not found: %s", study_area_path)
+        sys.exit(1)
+
+    study_area_gdf = gpd.read_file(study_area_path)
+    if study_area_gdf.index.name != "region_id":
+        if "region_id" not in study_area_gdf.columns:
+            log.error("Study area file must have a 'region_id' column or index.")
+            sys.exit(1)
+        study_area_gdf = study_area_gdf.set_index("region_id")
+
+    metrics = None if args.metrics.strip().lower() == "all" else [m.strip() for m in args.metrics.split(",") if m.strip()]
+
+    try:
+        compute_urban_morphometrics(
+            study_area_gdf=study_area_gdf,
+            pbf_path=args.pbf_path,
+            run_name=args.run_name,
+            output_folder=args.output_folder,
+            neighbourhood_distance=args.neighbourhood_distance,
+            num_quantiles=args.num_quantiles,
+            metrics=metrics,
+            equal_area_crs=args.equal_area_crs,
+            equidistant_crs=args.equidistant_crs,
+            conformal_crs=args.conformal_crs,
+            debug=args.debug,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        log.error("%s", e)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

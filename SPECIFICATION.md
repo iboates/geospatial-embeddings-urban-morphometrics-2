@@ -1,4 +1,4 @@
-Make a plan to implement such a pipeline.
+Make a plan to implement such a pipeline:
 
 Use Fire as a CLI.
 
