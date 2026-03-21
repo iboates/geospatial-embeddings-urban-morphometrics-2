@@ -1,32 +1,40 @@
 """Courtyards metric.
 
-Number of courtyards within the joined structure each building belongs to.
-A courtyard is an enclosed open space surrounded by connected buildings.
+Total number of courtyards in the focal cell. All buildings (focal +
+neighbourhood) are dissolved into superstructures; superstructures that
+intersect the focal cell are kept, and their interior ring counts are summed.
 
 Requires neighbourhood context so buildings near the cell boundary are connected
 to their neighbours across the boundary, avoiding false courtyard splits at the
 cell edge.
 """
 
-import pandas as pd
-import momepy
+import geopandas as gpd
+from shapely.ops import unary_union
+from shapely.geometry import Polygon
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
-from urban_morphometrics.metrics.aggregation import aggregate_series
 
 
 @register("courtyards")
 def compute(ctx: CellContext, num_quantiles: int) -> dict:
-    """Number of courtyards per building's joined structure."""
+    """Total courtyard count for the focal cell."""
     b = ctx.buildings_ea
     if b.empty:
-        return aggregate_series(pd.Series(dtype=float), "courtyards", num_quantiles)
+        return {"courtyards_count": 0}
 
     all_b = ctx.focal_plus_neighbourhood_buildings
-    graph = ctx.contiguity_graph
-    if graph is None:
-        return aggregate_series(pd.Series(dtype=float), "courtyards", num_quantiles)
+    dissolved = unary_union(all_b.geometry)
+    geoms = dissolved.geoms if hasattr(dissolved, "geoms") else [dissolved]
 
-    values = momepy.courtyards(all_b, graph)
-    return aggregate_series(values.reindex(b.index), "courtyards", num_quantiles)
+    structures = gpd.GeoDataFrame(
+        geometry=[g for g in geoms if isinstance(g, Polygon)],
+        crs=all_b.crs,
+    )
+
+    focal_union = unary_union(b.geometry)
+    structures = structures[structures.intersects(focal_union)]
+
+    structures["courtyards"] = structures.geometry.apply(lambda g: len(g.interiors))
+    return {"courtyards_count": int(structures["courtyards"].sum())}

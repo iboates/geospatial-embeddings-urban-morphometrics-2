@@ -10,7 +10,7 @@ This document catalogues every metric computed by the pipeline, grouped by categ
 
 | Metric | momepy function | Neighbourhood | What it measures |
 |--------|----------------|:---:|-----------------|
-| `courtyard_area` | *(custom)* | No | Area of interior courtyards. Adjacent buildings are dissolved into unified structures; each interior ring (hole) is extracted as an individual courtyard polygon. Statistics are computed over individual courtyard areas, plus a count. |
+| `courtyard_area` | *(custom)* | **Yes** | Area of interior courtyards. Focal and neighbourhood buildings are dissolved into unified structures; each interior ring (hole) that intersects a focal building is extracted as an individual courtyard polygon. Statistics are computed over individual courtyard areas, plus a count. |
 | `floor_area` | *(custom)* | No | Footprint area multiplied by number of floors. Floor count comes from OSM `building:levels` tag, or `height / 3m` as fallback. |
 | `longest_axis_length` | `momepy.longest_axis_length` | No | Diameter of the minimum bounding circle of each building footprint. Measures the longest dimension of the building. |
 | `perimeter_wall` | `momepy.perimeter_wall` | No | Perimeter of joined (touching) structures. Buildings that share walls are dissolved; the returned perimeter is the outer boundary of the merged structure, not individual buildings. |
@@ -64,7 +64,7 @@ These metrics describe the spatial arrangement, orientation, and relationships *
 
 | Metric | momepy function | Neighbourhood | What it measures |
 |--------|----------------|:---:|-----------------|
-| `courtyards` | `momepy.courtyards` | **Yes** | Number of courtyards (interior rings) in each building and its contiguous (wall-sharing) neighbours, counted via a rook contiguity graph. Captures enclosed courtyard structures formed by groups of adjacent buildings. |
+| `courtyards` | *(custom)* | **Yes** | Total number of courtyards in the focal cell. All buildings (focal + neighbourhood) are dissolved into superstructures; interior rings of superstructures that intersect any focal building are counted. Returns a single `courtyards_count` value per cell. |
 
 ---
 
@@ -117,8 +117,8 @@ All connectivity metrics require neighbourhood context because the street networ
 
 ## Summary: Which Metrics Need Neighbourhood Context?
 
-**Self-contained** (focal-cell data only — 22 metrics):
-`courtyard_area`, `floor_area`, `longest_axis_length`, `perimeter_wall`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `courtyard_index`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
+**Self-contained** (focal-cell data only — 21 metrics):
+`floor_area`, `longest_axis_length`, `perimeter_wall`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `courtyard_index`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
 
-**Require neighbourhood context** (data from beyond the cell boundary — 10 building/street metrics + 34 connectivity metrics):
-`shared_walls`, `alignment`, `neighbor_distance`, `mean_interbuilding_distance`, `building_adjacency`, `neighbors`, `cell_alignment`, `street_alignment`, `courtyards`, `street_profile`, `nearest_street_distance`, and all `*_vehicle` / `*_pedestrian` connectivity metrics
+**Require neighbourhood context** (data from beyond the cell boundary — 11 building/street metrics + 34 connectivity metrics):
+`courtyard_area`, `shared_walls`, `alignment`, `neighbor_distance`, `mean_interbuilding_distance`, `building_adjacency`, `neighbors`, `cell_alignment`, `street_alignment`, `courtyards`, `street_profile`, `nearest_street_distance`, and all `*_vehicle` / `*_pedestrian` connectivity metrics

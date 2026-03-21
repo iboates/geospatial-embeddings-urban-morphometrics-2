@@ -8,8 +8,16 @@ arterial networks.
 Computed for both vehicle and pedestrian networks. Focal nodes only.
 """
 
+import warnings
+
 import pandas as pd
 import momepy
+
+# momepy.mean_node_dist computes np.mean over successor edge lengths. Nodes at
+# the boundary of a one-way street with no outgoing edges produce an empty list,
+# triggering these numpy warnings. This is expected for clipped subgraphs.
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in scalar divide")
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
@@ -22,7 +30,7 @@ def _compute(graph, suffix, cell_geom, num_quantiles) -> dict:
     empty = aggregate_series(pd.Series(dtype=float), prefix, num_quantiles)
     if graph is None:
         return empty
-    graph = momepy.mean_node_dist(graph)
+    graph = momepy.mean_node_dist(graph, verbose=False)
     values = focal_nodes_series(graph, "meanlen", cell_geom)
     return aggregate_series(values, prefix, num_quantiles)
 
