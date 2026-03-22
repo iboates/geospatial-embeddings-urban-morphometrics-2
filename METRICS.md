@@ -51,13 +51,13 @@ These metrics describe the spatial arrangement, orientation, and relationships *
 |--------|----------------|:---:|-----------------|
 | `orientation` | `momepy.orientation` | No | Deviation of each building's longest axis from cardinal directions (0°–45° range). Low mean orientation → grid-aligned; high values → organic layout. |
 | `shared_walls` | `momepy.shared_walls` | **Yes** | Length of wall shared between adjacent (touching) buildings. Also computes a ratio variant: shared wall length as a fraction of each building's total perimeter. High values indicate terraced/attached housing. |
-| `alignment` | `momepy.alignment` | **Yes** | Consistency of orientation among neighbouring buildings. Uses a KNN graph (k=15) to define neighbours, then measures how similarly oriented each building is relative to its neighbours. Low values → uniform grid; high values → heterogeneous orientations. |
+| `alignment` | `momepy.alignment` | **Yes** | Consistency of orientation among neighbouring buildings. Uses a KNN graph to define neighbours (`knn_k` parameter, default 15), then measures how similarly oriented each building is relative to its neighbours. Low values → uniform grid; high values → heterogeneous orientations. |
 | `neighbor_distance` | `momepy.neighbor_distance` | **Yes** | Mean distance from each building to its Delaunay-triangulation neighbours. Captures typical spacing between nearby buildings. |
-| `mean_interbuilding_distance` | `momepy.mean_interbuilding_distance` | **Yes** | Mean distance between a building and all buildings within its Delaunay+KNN neighbourhood. A broader spacing measure than `neighbor_distance`. |
-| `building_adjacency` | `momepy.building_adjacency` | **Yes** | Ratio of buildings that share a wall (rook contiguity) to the number of KNN neighbours. High values indicate predominantly attached/terraced buildings. |
-| `neighbors` | `momepy.neighbors` | **Yes** | Number of neighbours for each building's Voronoi tessellation cell (queen contiguity). Captures how many buildings surround each building in the morphological tessellation. |
+| `mean_interbuilding_distance` | `momepy.mean_interbuilding_distance` | **Yes** | Mean distance between a building and all buildings within its Delaunay+KNN neighbourhood (`knn_k` parameter, default 15). A broader spacing measure than `neighbor_distance`. |
+| `building_adjacency` | `momepy.building_adjacency` | **Yes** | Ratio of buildings that share a wall (rook contiguity) to the number of KNN neighbours (`knn_k` parameter, default 15). High values indicate predominantly attached/terraced buildings. |
+| `neighbors` | `momepy.neighbors` | **Yes** | Number of neighbours for each building's morphological tessellation cell, measured by queen contiguity on the tessellation. The tessellation is a Voronoi-like partitioning of space where each building "owns" the area closest to it (clipped by a buffered convex hull). Queen contiguity counts tessellation cells that share any boundary point with the focal cell — i.e. all buildings whose territory touches the focal building's territory. High values → densely surrounded building; low values → isolated building with few close neighbours. Tessellation parameters control the shape of the cells and are configurable via `--metric-config`: `tessellation_buffer` (default 5), `tessellation_min_buffer` (default 0), `tessellation_max_buffer` (default 10), `tessellation_shrink` (default 0.4m), `tessellation_segment` (default 0.5m). |
 | `cell_alignment` | `momepy.cell_alignment` | **Yes** | Deviation between each building's orientation and the orientation of its tessellation cell. Measures how well aligned buildings are with the local urban fabric (Voronoi partitioning). |
-| `street_alignment` | `momepy.street_alignment` | **Yes** | Deviation between each building's orientation and the orientation of its nearest street. Uses `momepy.get_nearest_street` (500m max) to match buildings to streets, then compares orientations. Low values → buildings parallel/perpendicular to streets. |
+| `street_alignment` | `momepy.street_alignment` | **Yes** | Deviation between each building's orientation and the orientation of its nearest street. Uses `momepy.get_nearest_street` to match buildings to streets (`street_alignment_max_distance` parameter, default 500m; buildings with no street within this radius get NaN), then compares orientations. Low values → buildings parallel/perpendicular to streets. |
 
 ---
 
@@ -82,17 +82,19 @@ These metrics describe the spatial arrangement, orientation, and relationships *
 
 All connectivity metrics require neighbourhood context because the street network graph is severely distorted when truncated at a cell boundary — centrality measures, cycle counts, and node degrees all depend on the wider network topology. Each metric below is computed separately for the **vehicle** network (directed graph respecting one-way streets) and the **pedestrian** network (undirected graph).
 
+**Graph cleaning:** Before building either graph, degree-2 interstitial nodes (passthrough points that are not true intersections) are dissolved using `remove_interstitial_nodes_preserving_oneway` in `metrics/_utils.py`. A node is only removed when exactly 2 edges meet *and* both share the same `oneway` value — nodes at a oneway/bidirectional boundary (e.g. where a one-way street meets a two-way street) are preserved even if they are degree 2, preventing corruption of the directed graph.
+
 ### Per-Node Metrics (aggregated: mean, median, std, deciles)
 
 | Metric | momepy function | What it measures |
 |--------|----------------|-----------------|
 | `degree` | `momepy.node_degree` | Number of edges meeting at each intersection. 1 = dead end; 3 = T-junction; 4 = crossroads. |
-| `meshedness` | `momepy.meshedness` | Local ratio of independent cycles to the maximum possible. High values → grid-like network with many alternative routes. |
-| `mean_node_dist` | `momepy.mean_node_dist` | Mean distance between a node and its graph neighbours. Captures typical block length / intersection spacing. |
-| `mean_node_degree` | `momepy.mean_node_degree` | Mean degree within a local subgraph around each node. Smoothed version of raw degree. |
-| `gamma` | `momepy.gamma` | Local ratio of observed edges to maximum possible edges. Measures local connectivity completeness. |
-| `edge_node_ratio` | `momepy.edge_node_ratio` | Local ratio of edges to nodes. Higher values → more connections per intersection. |
-| `cyclomatic` | `momepy.cyclomatic` | Number of independent cycles in the local subgraph. More cycles → more route alternatives. |
+| `meshedness` | `momepy.meshedness` | Local ratio of independent cycles to the maximum possible within a subgraph around each node (`network_subgraph_radius` hops, default 5). High values → grid-like network with many alternative routes. |
+| `mean_node_dist` | `momepy.mean_node_dist` | Mean distance between a node and its direct graph neighbours. Captures typical block length / intersection spacing. |
+| `mean_node_degree` | `momepy.mean_node_degree` | Mean degree within a local subgraph around each node (`network_subgraph_radius` hops, default 5). Smoothed version of raw degree. |
+| `gamma` | `momepy.gamma` | Local ratio of observed edges to maximum possible edges within a subgraph around each node (`network_subgraph_radius` hops, default 5). Measures local connectivity completeness. |
+| `edge_node_ratio` | `momepy.edge_node_ratio` | Local ratio of edges to nodes within a subgraph around each node (`network_subgraph_radius` hops, default 5). Higher values → more connections per intersection. |
+| `cyclomatic` | `momepy.cyclomatic` | Number of independent cycles in a local subgraph around each node (`network_subgraph_radius` hops, default 5). More cycles → more route alternatives. |
 | `clustering` | `momepy.clustering` | Clustering coefficient — fraction of a node's neighbours that are also connected to each other. High values → tightly interconnected local network. |
 | `closeness_centrality` | `momepy.closeness_centrality` | Inverse of the mean shortest-path distance to all other nodes. High values → nodes close to the centre of the network. |
 | `betweenness_centrality` | `momepy.betweenness_centrality` | Fraction of all shortest paths that pass through each node. High values → key through-traffic intersections. |

@@ -12,38 +12,18 @@ Two graph variants are produced per cell:
 Both are built from focal + neighbourhood highways (in equidistant CRS)
 to avoid edge effects on nodes near the cell boundary. Step 10 metrics
 filter results back to focal nodes before aggregating.
-
-Note: momepy.remove_false_nodes is used to clean up degree-2 nodes
-(points in the middle of a street that are not true intersections). This
-function is deprecated in momepy 0.11 in favour of neatnet, but the
-underlying logic is unchanged and it continues to work correctly.
 """
 
 import logging
-import warnings
 
-warnings.filterwarnings("ignore", category=FutureWarning, message=".*remove_false_nodes.*")
-
-import geopandas as gpd
 import momepy
 import pandas as pd
 
+from urban_morphometrics.metrics._utils import (
+    remove_interstitial_nodes_preserving_oneway,
+)
+
 log = logging.getLogger(__name__)
-
-
-def _remove_false_nodes_preserving_oneway(highways_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Run remove_false_nodes per oneway group, reassigning the known value after.
-
-    remove_false_nodes does not reliably preserve column values on merged edges.
-    Grouping by oneway ensures every edge in a group shares the same value, so
-    we can safely reassign it from the group key after cleaning.
-    """
-    parts = []
-    for oneway_val, group in highways_gdf.groupby("oneway", dropna=False):
-        cleaned = momepy.remove_false_nodes(group)
-        cleaned["oneway"] = oneway_val
-        parts.append(cleaned)
-    return gpd.GeoDataFrame(pd.concat(parts), crs=highways_gdf.crs)
 
 
 def build_vehicle_graph(highways_gdf):
@@ -56,7 +36,7 @@ def build_vehicle_graph(highways_gdf):
     """
     if highways_gdf.empty:
         return None
-    cleaned = _remove_false_nodes_preserving_oneway(highways_gdf)
+    cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
     return momepy.gdf_to_nx(cleaned, directed=True, oneway_column="oneway")
 
 
@@ -69,7 +49,7 @@ def build_pedestrian_graph(highways_gdf):
     """
     if highways_gdf.empty:
         return None
-    cleaned = momepy.remove_false_nodes(highways_gdf)
+    cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
     return momepy.gdf_to_nx(cleaned, directed=False)
 
 
