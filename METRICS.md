@@ -21,14 +21,14 @@ This document catalogues every metric computed by the pipeline, grouped by categ
 
 ## Shape Metrics
 
-All shape metrics are self-contained per-building calculations with no neighbourhood dependency.
+Most shape metrics are self-contained per-building calculations with no neighbourhood dependency. Exception: `courtyard_index` requires neighbourhood context.
 
 | Metric | momepy function | What it measures |
 |--------|----------------|-----------------|
 | `circular_compactness` | `momepy.circular_compactness` | Ratio of building area to the area of its minimum bounding circle. Values near 1 indicate circular footprints; lower values indicate irregular shapes. |
 | `square_compactness` | `momepy.square_compactness` | `(4 * sqrt(area) / perimeter)^2`. Measures how efficiently the perimeter encloses area. A perfect square scores 1. |
 | `convexity` | `momepy.convexity` | Ratio of building area to its convex hull area. Values near 1 mean the footprint has no concavities; lower values indicate L-shapes, courtyards, or other concave forms. |
-| `courtyard_index` | `momepy.courtyard_index` | Ratio of courtyard (interior hole) area to total footprint area, computed on dissolved structures. Only structures with courtyards are included; cells with no courtyards get NaN. |
+| `courtyard_index` | `momepy.courtyard_index` | **Neighbourhood** Ratio of courtyard (interior hole) area to total footprint area. Focal and neighbourhood buildings are dissolved together so boundary-spanning courtyards are captured correctly. Only dissolved structures intersecting the focal cell that contain at least one interior ring are included. Cells with no courtyards produce all-NaN aggregated statistics. |
 | `rectangularity` | `momepy.rectangularity` | Ratio of building area to its minimum rotated bounding rectangle. Values near 1 indicate rectangular footprints. |
 | `shape_index` | `momepy.shape_index` | `sqrt(area / pi) / (0.5 * longest_axis)`. Measures how close the shape is to a circle. A perfect circle scores 1. |
 | `corners` | `momepy.corners` | Count of vertices where the interior angle deviates significantly from 180°. Captures footprint complexity. |
@@ -118,8 +118,8 @@ All connectivity metrics require neighbourhood context because the street networ
 
 ## Summary: Which Metrics Need Neighbourhood Context?
 
-**Self-contained** (focal-cell data only — 21 metrics):
-`floor_area`, `longest_axis_length`, `perimeter_wall_individual`, `perimeter_wall_joined`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `courtyard_index`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
+**Self-contained** (focal-cell data only — 20 metrics):
+`floor_area`, `longest_axis_length`, `perimeter_wall_individual`, `perimeter_wall_joined`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
 
-**Require neighbourhood context** (data from beyond the cell boundary — 11 building/street metrics + 34 connectivity metrics):
-`courtyard_area`, `shared_walls`, `alignment`, `neighbor_distance`, `mean_interbuilding_distance`, `building_adjacency`, `neighbors`, `cell_alignment`, `street_alignment`, `courtyards`, `street_profile`, `nearest_street_distance`, and all `*_vehicle` / `*_pedestrian` connectivity metrics
+**Require neighbourhood context** (data from beyond the cell boundary — 12 building/street metrics + 34 connectivity metrics):
+`courtyard_area`, `courtyard_index`, `courtyards`, `shared_walls`, `alignment`, `neighbor_distance`, `mean_interbuilding_distance`, `building_adjacency`, `neighbors`, `cell_alignment`, `street_alignment`, `street_profile`, `nearest_street_distance`, and all `*_vehicle` / `*_pedestrian` connectivity metrics
