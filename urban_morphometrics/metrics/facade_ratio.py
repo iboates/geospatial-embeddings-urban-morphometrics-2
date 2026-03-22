@@ -16,7 +16,6 @@ import momepy
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
-from urban_morphometrics.metrics._utils import dissolve_touching
 from urban_morphometrics.metrics.features import write_features
 
 
@@ -36,8 +35,8 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
         write_features(b[["geometry"]].assign(facade_ratio=raw_values), features_dir / "facade_ratio.gpkg")
     result = aggregate_series(raw_values, "facade_ratio", num_quantiles)
 
-    dissolved = dissolve_touching(b)
-    joined_values = momepy.facade_ratio(dissolved)
+    dissolved = ctx.dissolved_buildings_ea
+    joined_values = momepy.facade_ratio(dissolved) if not dissolved.empty else pd.Series(dtype=float)
     if features_dir is not None:
         write_features(dissolved[["geometry"]].assign(facade_ratio_joined=joined_values), features_dir / "facade_ratio_joined.gpkg")
     result.update(aggregate_series(joined_values, "facade_ratio_joined", num_quantiles))

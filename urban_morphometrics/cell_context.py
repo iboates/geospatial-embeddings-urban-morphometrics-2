@@ -11,7 +11,8 @@ from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import shape
+from shapely.geometry import shape, Polygon
+from shapely.ops import unary_union
 
 from urban_morphometrics.constants import VEHICLE_HIGHWAY_TYPES, PEDESTRIAN_HIGHWAY_TYPES
 from urban_morphometrics.height import resolve_heights
@@ -20,6 +21,17 @@ from urban_morphometrics.oneway import apply_oneway
 from urban_morphometrics.osm_loader import OsmData
 
 log = logging.getLogger(__name__)
+
+
+def _dissolve_buildings(buildings: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Dissolve touching buildings into superstructures (one row per structure)."""
+
+    dissolved = unary_union(buildings.geometry)
+    geoms = list(dissolved.geoms) if hasattr(dissolved, "geoms") else [dissolved]
+    return gpd.GeoDataFrame(
+        geometry=[g for g in geoms if isinstance(g, Polygon)],
+        crs=buildings.crs,
+    )
 
 
 class CellContext:
@@ -269,6 +281,28 @@ class CellContext:
             "neighbourhood_pedestrian_highways",
             lambda: self._filter_highways(PEDESTRIAN_HIGHWAY_TYPES, self._ea_crs, self._neighbourhood_highway_index),
         )
+
+    # ------------------------------------------------------------------
+    # Dissolved buildings (touching superstructures)
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def dissolved_buildings_ea(self) -> gpd.GeoDataFrame:
+        """Focal buildings dissolved into touching superstructures, in equal-area CRS."""
+        return self._load_or_compute(
+            "dissolved_buildings_ea",
+            lambda: _dissolve_buildings(self.buildings_ea),
+        )
+
+    @cached_property
+    def dissolved_buildings_cf(self) -> gpd.GeoDataFrame:
+        """Focal buildings dissolved into touching superstructures, in conformal CRS."""
+        return self.dissolved_buildings_ea.to_crs(self._cf_crs)
+
+    @cached_property
+    def dissolved_buildings_ed(self) -> gpd.GeoDataFrame:
+        """Focal buildings dissolved into touching superstructures, in equidistant CRS."""
+        return self.dissolved_buildings_ea.to_crs(self._ed_crs)
 
     # ------------------------------------------------------------------
     # Focal + neighbourhood combined (for edge-effect-free metrics)

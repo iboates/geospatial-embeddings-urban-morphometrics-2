@@ -15,7 +15,6 @@ import momepy
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
-from urban_morphometrics.metrics._utils import dissolve_touching
 from urban_morphometrics.metrics.features import write_features
 
 
@@ -35,8 +34,8 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
         write_features(b[["geometry"]].assign(compactness_weighted_axis=raw_values), features_dir / "compactness_weighted_axis.gpkg")
     result = aggregate_series(raw_values, "compactness_weighted_axis", num_quantiles)
 
-    dissolved = dissolve_touching(b)
-    joined_values = momepy.compactness_weighted_axis(dissolved)
+    dissolved = ctx.dissolved_buildings_ea
+    joined_values = momepy.compactness_weighted_axis(dissolved) if not dissolved.empty else pd.Series(dtype=float)
     if features_dir is not None:
         write_features(dissolved[["geometry"]].assign(compactness_weighted_axis_joined=joined_values), features_dir / "compactness_weighted_axis_joined.gpkg")
     result.update(aggregate_series(joined_values, "compactness_weighted_axis_joined", num_quantiles))

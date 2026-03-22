@@ -27,11 +27,28 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
     correct result. The fix (np.clip before arccos) belongs upstream in momepy.
     """
     b = ctx.buildings_ea
+    empty = pd.Series(dtype=float)
     if b.empty:
-        return aggregate_series(pd.Series(dtype=float), "squareness", num_quantiles)
+        return {
+            **aggregate_series(empty, "squareness", num_quantiles),
+            **aggregate_series(empty, "squareness_joined", num_quantiles),
+        }
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", "invalid value encountered in arccos", RuntimeWarning)
         values = momepy.squareness(b)
+
+    d = ctx.dissolved_buildings_ea
+    if not d.empty:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "invalid value encountered in arccos", RuntimeWarning)
+            joined_values = momepy.squareness(d)
+    else:
+        joined_values = empty
+
     if features_dir is not None:
         write_features(b[["geometry"]].assign(squareness=values), features_dir / "squareness.gpkg")
-    return aggregate_series(values, "squareness", num_quantiles)
+        write_features(d[["geometry"]].assign(squareness_joined=joined_values), features_dir / "squareness_joined.gpkg")
+
+    result = aggregate_series(values, "squareness", num_quantiles)
+    result.update(aggregate_series(joined_values, "squareness_joined", num_quantiles))
+    return result

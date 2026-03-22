@@ -13,10 +13,7 @@ Both use equidistant CRS. Values are in metres.
 
 from pathlib import Path
 
-import geopandas as gpd
 import pandas as pd
-from shapely.ops import unary_union
-from shapely.geometry import Polygon
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
@@ -35,12 +32,7 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
 
     individual = b.geometry.length
 
-    dissolved = unary_union(b.geometry)
-    geoms = list(dissolved.geoms) if hasattr(dissolved, "geoms") else [dissolved]
-    structures = gpd.GeoDataFrame(
-        geometry=[g for g in geoms if isinstance(g, Polygon)],
-        crs=b.crs,
-    )
+    structures = ctx.dissolved_buildings_ed
     joined = structures.geometry.length
 
     if features_dir is not None:

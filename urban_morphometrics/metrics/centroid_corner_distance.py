@@ -18,7 +18,6 @@ import momepy
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
-from urban_morphometrics.metrics._utils import dissolve_touching
 from urban_morphometrics.metrics.features import write_features
 
 
@@ -60,7 +59,10 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
 
     result = _aggregate_ccd(b, "ccd", num_quantiles, features_dir)
 
-    dissolved = dissolve_touching(b)
-    result.update(_aggregate_ccd(dissolved, "ccd_joined", num_quantiles, features_dir))
+    dissolved = ctx.dissolved_buildings_ea
+    result.update(_aggregate_ccd(dissolved, "ccd_joined", num_quantiles, features_dir) if not dissolved.empty else {
+        **aggregate_series(pd.Series(dtype=float), "ccd_mean_joined", num_quantiles),
+        **aggregate_series(pd.Series(dtype=float), "ccd_std_joined", num_quantiles),
+    })
 
     return result

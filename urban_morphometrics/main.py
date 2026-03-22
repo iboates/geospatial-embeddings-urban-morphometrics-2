@@ -5,6 +5,7 @@ import logging
 import sys
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import geopandas as gpd
@@ -88,6 +89,7 @@ def compute_urban_morphometrics(
     use_cache: bool = True,
     metric_config: "dict | MetricConfig | None" = None,
     export_features: bool = False,
+    n_workers: int = 1,
 ) -> None:
     """Compute urban morphology metrics for a study area from OSM data.
 
@@ -109,6 +111,9 @@ def compute_urban_morphometrics(
             ``_metrics.parquet`` exists. The cache is also not written.
         export_features: When True, write per-feature GeoPackages to features/{region_id}/
             for each metric.
+        n_workers: Number of threads for parallel cell processing (default 1 = sequential).
+            Shapely/numpy release the GIL so threading provides real parallelism without
+            the overhead of copying osm_data across processes.
     """
     output_folder = Path(output_folder)
 
@@ -160,38 +165,45 @@ def compute_urban_morphometrics(
         osm_data.highways.to_file(debug_dir / "highways.gpkg", driver="GPKG")
         osm_data.landuse.to_file(debug_dir / "landuse.gpkg", driver="GPKG")
 
+    def _process_cell(region_id, row):
+        cell_cache_dir = cache_dir / str(region_id)
+        metrics_cache = cell_cache_dir / "_metrics.parquet"
+        if use_cache and metrics_cache.exists():
+            return region_id, row.geometry, pd.read_parquet(metrics_cache).iloc[0].to_dict()
+        ctx = CellContext(
+            region_id=region_id,
+            cell_geometry=row.geometry,
+            osm_data=osm_data,
+            neighbourhood_distance=neighbourhood_distance,
+            equal_area_crs=equal_area_crs,
+            equidistant_crs=equidistant_crs,
+            conformal_crs=conformal_crs,
+            cache_dir=cell_cache_dir,
+            config=cfg,
+        )
+        cell_features_dir = (features_dir / str(region_id)) if export_features else None
+        metric_row = compute_metrics(ctx, metrics, num_quantiles, features_dir=cell_features_dir)
+        if use_cache:
+            pd.DataFrame([metric_row]).to_parquet(metrics_cache)
+        return region_id, row.geometry, metric_row
+
     rows = []
     n_total = len(study_area_gdf)
     n_failed = 0
-    for region_id, row in tqdm(study_area_gdf.iterrows(), total=n_total, desc="Cells", unit="cell"):
-        cell_cache_dir = cache_dir / str(region_id)
-        metrics_cache = cell_cache_dir / "_metrics.parquet"
 
-        try:
-            if use_cache and metrics_cache.exists():
-                metric_row = pd.read_parquet(metrics_cache).iloc[0].to_dict()
-            else:
-                ctx = CellContext(
-                    region_id=region_id,
-                    cell_geometry=row.geometry,
-                    osm_data=osm_data,
-                    neighbourhood_distance=neighbourhood_distance,
-                    equal_area_crs=equal_area_crs,
-                    equidistant_crs=equidistant_crs,
-                    conformal_crs=conformal_crs,
-                    cache_dir=cell_cache_dir,
-                    config=cfg,
-                )
-                cell_features_dir = (features_dir / str(region_id)) if export_features else None
-                metric_row = compute_metrics(ctx, metrics, num_quantiles, features_dir=cell_features_dir)
-                if use_cache:
-                    pd.DataFrame([metric_row]).to_parquet(metrics_cache)
-        except Exception:
-            log.warning("Cell %s failed — skipping", region_id, exc_info=True)
-            n_failed += 1
-            continue
-
-        rows.append({"region_id": region_id, "geometry": row.geometry, **metric_row})
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {
+            executor.submit(_process_cell, region_id, row): region_id
+            for region_id, row in study_area_gdf.iterrows()
+        }
+        for future in tqdm(as_completed(futures), total=n_total, desc="Cells", unit="cell"):
+            region_id = futures[future]
+            try:
+                rid, geom, metric_row = future.result()
+                rows.append({"region_id": rid, "geometry": geom, **metric_row})
+            except Exception:
+                log.warning("Cell %s failed — skipping", region_id, exc_info=True)
+                n_failed += 1
 
     if n_failed:
         log.warning("%d / %d cells failed and were excluded from results", n_failed, n_total)
@@ -220,6 +232,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--debug", action="store_true", help="Dump intermediate layers to the debug folder.")
     p.add_argument("--no-cache", action="store_true", help="Recompute metrics for every cell, ignoring and not writing the cache.")
     p.add_argument("--export-features", action="store_true", help="Write per-feature GeoPackages to features/{region_id}/ for each metric.")
+    p.add_argument("--workers", type=int, default=1, metavar="N", help="Number of parallel worker threads for cell processing (default: 1).")
     p.add_argument(
         "--metric-config",
         metavar="PATH",
@@ -267,6 +280,7 @@ def main() -> None:
             use_cache=not args.no_cache,
             metric_config=metric_config,
             export_features=args.export_features,
+            n_workers=args.workers,
         )
     except (FileNotFoundError, ValueError) as e:
         log.error("%s", e)

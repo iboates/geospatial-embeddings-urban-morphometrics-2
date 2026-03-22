@@ -26,11 +26,28 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
     correct result. The fix (np.clip before arccos) belongs upstream in momepy.
     """
     b = ctx.buildings_ea
+    empty = pd.Series(dtype=float)
     if b.empty:
-        return aggregate_series(pd.Series(dtype=float), "corners", num_quantiles)
+        return {
+            **aggregate_series(empty, "corners", num_quantiles),
+            **aggregate_series(empty, "corners_joined", num_quantiles),
+        }
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", "invalid value encountered in arccos", RuntimeWarning)
         values = momepy.corners(b)
+
+    d = ctx.dissolved_buildings_ea
+    if not d.empty:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "invalid value encountered in arccos", RuntimeWarning)
+            joined_values = momepy.corners(d)
+    else:
+        joined_values = empty
+
     if features_dir is not None:
         write_features(b[["geometry"]].assign(corners=values), features_dir / "corners.gpkg")
-    return aggregate_series(values, "corners", num_quantiles)
+        write_features(d[["geometry"]].assign(corners_joined=joined_values), features_dir / "corners_joined.gpkg")
+
+    result = aggregate_series(values, "corners", num_quantiles)
+    result.update(aggregate_series(joined_values, "corners_joined", num_quantiles))
+    return result

@@ -20,9 +20,21 @@ from urban_morphometrics.metrics.features import write_features
 def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Shorter/longer side ratio of the minimum bounding rectangle per building (0–1)."""
     b = ctx.buildings_ea
+    empty = pd.Series(dtype=float)
     if b.empty:
-        return aggregate_series(pd.Series(dtype=float), "elongation", num_quantiles)
+        return {
+            **aggregate_series(empty, "elongation", num_quantiles),
+            **aggregate_series(empty, "elongation_joined", num_quantiles),
+        }
     values = momepy.elongation(b)
+
+    d = ctx.dissolved_buildings_ea
+    joined_values = momepy.elongation(d) if not d.empty else empty
+
     if features_dir is not None:
         write_features(b[["geometry"]].assign(elongation=values), features_dir / "elongation.gpkg")
-    return aggregate_series(values, "elongation", num_quantiles)
+        write_features(d[["geometry"]].assign(elongation_joined=joined_values), features_dir / "elongation_joined.gpkg")
+
+    result = aggregate_series(values, "elongation", num_quantiles)
+    result.update(aggregate_series(joined_values, "elongation_joined", num_quantiles))
+    return result

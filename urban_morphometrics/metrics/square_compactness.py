@@ -19,9 +19,21 @@ from urban_morphometrics.metrics.features import write_features
 def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """(4√area / perimeter)² per building — 1 for a perfect square."""
     b = ctx.buildings_ea
+    empty = pd.Series(dtype=float)
     if b.empty:
-        return aggregate_series(pd.Series(dtype=float), "square_compactness", num_quantiles)
+        return {
+            **aggregate_series(empty, "square_compactness", num_quantiles),
+            **aggregate_series(empty, "square_compactness_joined", num_quantiles),
+        }
     values = momepy.square_compactness(b)
+
+    d = ctx.dissolved_buildings_ea
+    joined_values = momepy.square_compactness(d) if not d.empty else empty
+
     if features_dir is not None:
         write_features(b[["geometry"]].assign(square_compactness=values), features_dir / "square_compactness.gpkg")
-    return aggregate_series(values, "square_compactness", num_quantiles)
+        write_features(d[["geometry"]].assign(square_compactness_joined=joined_values), features_dir / "square_compactness_joined.gpkg")
+
+    result = aggregate_series(values, "square_compactness", num_quantiles)
+    result.update(aggregate_series(joined_values, "square_compactness_joined", num_quantiles))
+    return result
