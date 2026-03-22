@@ -13,7 +13,8 @@ This document catalogues every metric computed by the pipeline, grouped by categ
 | `courtyard_area` | *(custom)* | **Yes** | Area of interior courtyards. Focal and neighbourhood buildings are dissolved into unified structures; each interior ring (hole) that intersects a focal building is extracted as an individual courtyard polygon. Statistics are computed over individual courtyard areas, plus a count. |
 | `floor_area` | *(custom)* | No | Footprint area multiplied by number of floors. Floor count comes from OSM `building:levels` tag, or `height / 3m` as fallback. |
 | `longest_axis_length` | `momepy.longest_axis_length` | No | Diameter of the minimum bounding circle of each building footprint. Measures the longest dimension of the building. |
-| `perimeter_wall` | `momepy.perimeter_wall` | No | Perimeter of joined (touching) structures. Buildings that share walls are dissolved; the returned perimeter is the outer boundary of the merged structure, not individual buildings. |
+| `perimeter_wall_individual` | *(custom)* | No | Outer perimeter of each individual building footprint (`geometry.length` in equidistant CRS). Values in metres. |
+| `perimeter_wall_joined` | *(custom)* | No | Perimeter of joined (touching) structures. Buildings are dissolved via `unary_union`; one perimeter value is computed per dissolved structure (not per building), avoiding duplication in the statistics when multiple buildings share a structure. Values in metres. |
 | `volume` | *(custom)* | No | Footprint area multiplied by building height. Height comes from OSM `height` tag, or `building:levels * 3m`, or defaults to 6m. |
 
 ---
@@ -118,7 +119,7 @@ All connectivity metrics require neighbourhood context because the street networ
 ## Summary: Which Metrics Need Neighbourhood Context?
 
 **Self-contained** (focal-cell data only — 21 metrics):
-`floor_area`, `longest_axis_length`, `perimeter_wall`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `courtyard_index`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
+`floor_area`, `longest_axis_length`, `perimeter_wall_individual`, `perimeter_wall_joined`, `volume`, `circular_compactness`, `square_compactness`, `convexity`, `courtyard_index`, `rectangularity`, `shape_index`, `corners`, `squareness`, `equivalent_rectangular_index`, `elongation`, `facade_ratio`, `fractal_dimension`, `form_factor`, `compactness_weighted_axis`, `centroid_corner_distance`, `orientation`
 
 **Require neighbourhood context** (data from beyond the cell boundary — 11 building/street metrics + 34 connectivity metrics):
 `courtyard_area`, `shared_walls`, `alignment`, `neighbor_distance`, `mean_interbuilding_distance`, `building_adjacency`, `neighbors`, `cell_alignment`, `street_alignment`, `courtyards`, `street_profile`, `nearest_street_distance`, and all `*_vehicle` / `*_pedestrian` connectivity metrics

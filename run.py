@@ -23,11 +23,11 @@ def run_main():
     compute_urban_morphometrics(
         study_area_gdf=regions_gdf,
         pbf_path=pbf_url,
-        run_name="my_run4",
+        run_name="my_run5",
         neighbourhood_distance=200,
         num_quantiles=4,
         metric_config=metric_config,
-        # metrics=["longest_axis_length"],
+        metrics=["perimeter_wall"],
         debug=True,
         output_folder="/mnt/c/Users/Isaac/Downloads/urban_morphometrics",
         use_cache=False,
