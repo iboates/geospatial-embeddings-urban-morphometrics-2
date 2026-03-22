@@ -9,7 +9,9 @@ momepy.centroid_corner_distance returns a DataFrame with 'mean' and 'std' column
 each column is aggregated independently.
 """
 
+from pathlib import Path
 import warnings
+
 import pandas as pd
 import momepy
 
@@ -17,9 +19,10 @@ from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
 from urban_morphometrics.metrics._utils import dissolve_touching
+from urban_morphometrics.metrics.features import write_features
 
 
-def _aggregate_ccd(gdf, prefix: str, num_quantiles: int) -> dict:
+def _aggregate_ccd(gdf, prefix: str, num_quantiles: int, features_dir: Path | None = None) -> dict:
     # Two known warnings are suppressed here:
     # 1. "Mean of empty slice" / "Degrees of freedom <= 0": fired by np.nanmean/nanstd
     #    when a building has no vertices that deviate >10° from 180° (momepy's corner
@@ -32,13 +35,18 @@ def _aggregate_ccd(gdf, prefix: str, num_quantiles: int) -> dict:
         warnings.filterwarnings("ignore", "Degrees of freedom <= 0", RuntimeWarning)
         warnings.filterwarnings("ignore", "invalid value encountered in arccos", RuntimeWarning)
         ccd = momepy.centroid_corner_distance(gdf)
+    if features_dir is not None:
+        write_features(
+            gdf[["geometry"]].assign(**{f"{prefix}_mean": ccd["mean"], f"{prefix}_std": ccd["std"]}),
+            features_dir / f"{prefix}.gpkg",
+        )
     result = aggregate_series(ccd["mean"], f"{prefix}_mean", num_quantiles)
     result.update(aggregate_series(ccd["std"], f"{prefix}_std", num_quantiles))
     return result
 
 
 @register("centroid_corner_distance")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Mean and std of centroid-to-vertex distances per raw building and dissolved structure."""
     b = ctx.buildings_ea
     empty = pd.Series(dtype=float)
@@ -50,9 +58,9 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
             **aggregate_series(empty, "ccd_std_joined", num_quantiles),
         }
 
-    result = _aggregate_ccd(b, "ccd", num_quantiles)
+    result = _aggregate_ccd(b, "ccd", num_quantiles, features_dir)
 
     dissolved = dissolve_touching(b)
-    result.update(_aggregate_ccd(dissolved, "ccd_joined", num_quantiles))
+    result.update(_aggregate_ccd(dissolved, "ccd_joined", num_quantiles, features_dir))
 
     return result

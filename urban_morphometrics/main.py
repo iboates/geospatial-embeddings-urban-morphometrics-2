@@ -87,6 +87,7 @@ def compute_urban_morphometrics(
     debug: bool = False,
     use_cache: bool = True,
     metric_config: "dict | MetricConfig | None" = None,
+    export_features: bool = False,
 ) -> None:
     """Compute urban morphology metrics for a study area from OSM data.
 
@@ -106,6 +107,8 @@ def compute_urban_morphometrics(
         debug: When True, dump intermediate layers to the debug folder.
         use_cache: When False, metric results are always recomputed even if a cached
             ``_metrics.parquet`` exists. The cache is also not written.
+        export_features: When True, write per-feature GeoPackages to features/{region_id}/
+            for each metric.
     """
     output_folder = Path(output_folder)
 
@@ -129,6 +132,7 @@ def compute_urban_morphometrics(
     cache_dir = run_dir / "cache"
     results_dir = run_dir / "results"
     debug_dir = run_dir / "debug"
+    features_dir = run_dir / "features"
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -178,7 +182,8 @@ def compute_urban_morphometrics(
                     cache_dir=cell_cache_dir,
                     config=cfg,
                 )
-                metric_row = compute_metrics(ctx, metrics, num_quantiles)
+                cell_features_dir = (features_dir / str(region_id)) if export_features else None
+                metric_row = compute_metrics(ctx, metrics, num_quantiles, features_dir=cell_features_dir)
                 if use_cache:
                     pd.DataFrame([metric_row]).to_parquet(metrics_cache)
         except Exception:
@@ -214,6 +219,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--conformal-crs", default="EPSG:3857", help="Conformal CRS (default: EPSG:3857).")
     p.add_argument("--debug", action="store_true", help="Dump intermediate layers to the debug folder.")
     p.add_argument("--no-cache", action="store_true", help="Recompute metrics for every cell, ignoring and not writing the cache.")
+    p.add_argument("--export-features", action="store_true", help="Write per-feature GeoPackages to features/{region_id}/ for each metric.")
     p.add_argument(
         "--metric-config",
         metavar="PATH",
@@ -260,6 +266,7 @@ def main() -> None:
             debug=args.debug,
             use_cache=not args.no_cache,
             metric_config=metric_config,
+            export_features=args.export_features,
         )
     except (FileNotFoundError, ValueError) as e:
         log.error("%s", e)

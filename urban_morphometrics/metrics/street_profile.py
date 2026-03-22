@@ -17,6 +17,8 @@ Tick spacing and length are controlled by MetricConfig.street_profile_distance
 (default: 10 m) and MetricConfig.street_profile_tick_length (default: 50 m).
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 
@@ -24,10 +26,11 @@ from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.height import resolve_heights
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics.features import write_features
 
 
 @register("street_profile")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Width, openness, and height-to-width ratio per focal street segment."""
     streets = ctx.focal_plus_neighbourhood_vehicle_highways
     focal_streets = ctx.vehicle_highways_ea
@@ -55,6 +58,13 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     )
 
     focal_profile = profile.reindex(focal_streets.index)
+
+    if features_dir is not None:
+        export_gdf = focal_streets[["geometry"]].copy()
+        export_gdf["street_profile_width"] = focal_profile["width"]
+        export_gdf["street_profile_openness"] = focal_profile["openness"]
+        export_gdf["street_profile_hw_ratio"] = focal_profile["hw_ratio"]
+        write_features(export_gdf, features_dir / "street_profile.gpkg")
 
     result = {}
     result.update(aggregate_series(focal_profile["width"], "street_profile_width", num_quantiles))

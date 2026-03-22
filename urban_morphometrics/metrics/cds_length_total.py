@@ -9,6 +9,8 @@ Computed as a single scalar per graph (vehicle and pedestrian). Requires
 node degree to be set; this is computed inline before calling momepy.
 """
 
+from pathlib import Path
+
 import momepy
 
 from urban_morphometrics.cell_context import CellContext
@@ -23,7 +25,7 @@ def _compute(graph) -> float:
 
 
 @register("cds_length_total")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Total cul-de-sac segment length (m) for vehicle and pedestrian networks."""
     return {
         "cds_length_total_vehicle": _compute(ctx.vehicle_graph),

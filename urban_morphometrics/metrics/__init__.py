@@ -11,6 +11,7 @@ It receives the CellContext for the current cell and returns a flat dict of
 """
 
 import logging
+from pathlib import Path
 from typing import Callable
 
 from urban_morphometrics.cell_context import CellContext
@@ -96,6 +97,7 @@ def compute_metrics(
     ctx: CellContext,
     metric_names: list[str],
     num_quantiles: int,
+    features_dir: Path | None = None,
 ) -> dict:
     """Compute all requested metrics for a single cell.
 
@@ -104,6 +106,8 @@ def compute_metrics(
         metric_names: List of metric names to compute, or ["all"] for every
             registered metric.
         num_quantiles: Passed through to each metric's aggregation step.
+        features_dir: When provided, each metric writes a GeoPackage of its
+            per-feature computed values to this directory.
 
     Returns:
         Flat dict of {column_name: value} for all computed metrics combined.
@@ -119,7 +123,7 @@ def compute_metrics(
     row = {}
     for name in names:
         try:
-            result = REGISTRY[name](ctx, num_quantiles)
+            result = REGISTRY[name](ctx, num_quantiles, features_dir=features_dir)
             row.update(result)
         except Exception:
             log.warning("Metric '%s' failed for region %s", name, ctx.region_id, exc_info=True)

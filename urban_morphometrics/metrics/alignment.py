@@ -8,16 +8,19 @@ Requires neighbourhood context so KNN neighbours of edge buildings are not
 artificially restricted to buildings inside the focal cell.
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics.features import write_features
 
 
 @register("alignment")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Mean orientation deviation between each building and its KNN neighbours."""
     b = ctx.buildings_ea
     if b.empty:
@@ -30,4 +33,7 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     all_b = ctx.focal_plus_neighbourhood_buildings
     orient = momepy.orientation(all_b)
     values = momepy.alignment(orient, knn)
-    return aggregate_series(values.reindex(b.index), "alignment", num_quantiles)
+    focal_values = values.reindex(b.index)
+    if features_dir is not None:
+        write_features(b[["geometry"]].assign(alignment=focal_values), features_dir / "alignment.gpkg")
+    return aggregate_series(focal_values, "alignment", num_quantiles)

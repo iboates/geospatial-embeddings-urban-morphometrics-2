@@ -7,6 +7,8 @@ polygon fills space relative to its principal axes. Computed twice:
 - `compactness_weighted_axis_joined`: per dissolved structure (touching buildings merged)
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 
@@ -14,10 +16,11 @@ from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
 from urban_morphometrics.metrics._utils import dissolve_touching
+from urban_morphometrics.metrics.features import write_features
 
 
 @register("compactness_weighted_axis")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Longest-axis-weighted compactness per raw building and per dissolved structure."""
     b = ctx.buildings_ea
     empty = pd.Series(dtype=float)
@@ -27,9 +30,15 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
             **aggregate_series(empty, "compactness_weighted_axis_joined", num_quantiles),
         }
 
-    result = aggregate_series(momepy.compactness_weighted_axis(b), "compactness_weighted_axis", num_quantiles)
+    raw_values = momepy.compactness_weighted_axis(b)
+    if features_dir is not None:
+        write_features(b[["geometry"]].assign(compactness_weighted_axis=raw_values), features_dir / "compactness_weighted_axis.gpkg")
+    result = aggregate_series(raw_values, "compactness_weighted_axis", num_quantiles)
 
     dissolved = dissolve_touching(b)
-    result.update(aggregate_series(momepy.compactness_weighted_axis(dissolved), "compactness_weighted_axis_joined", num_quantiles))
+    joined_values = momepy.compactness_weighted_axis(dissolved)
+    if features_dir is not None:
+        write_features(dissolved[["geometry"]].assign(compactness_weighted_axis_joined=joined_values), features_dir / "compactness_weighted_axis_joined.gpkg")
+    result.update(aggregate_series(joined_values, "compactness_weighted_axis_joined", num_quantiles))
 
     return result

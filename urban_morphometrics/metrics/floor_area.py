@@ -5,12 +5,15 @@ the OSM 'building:levels' tag; if absent, height / 3 m is used as a fallback.
 All areas are in square metres (equal-area CRS).
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics.features import write_features
 
 _LEVELS_COL = "building:levels"
 _METRES_PER_STOREY = 3.0
@@ -36,7 +39,7 @@ def _floor_counts(buildings) -> pd.Series:
 
 
 @register("floor_area")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Compute floor area statistics for the focal cell.
 
     Floor area = footprint area × number of floors, where floors come from
@@ -49,4 +52,6 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     footprint_area = b.geometry.area
     floors = _floor_counts(b)
     floor_area = footprint_area * floors
+    if features_dir is not None:
+        write_features(b[["geometry"]].assign(floor_area=floor_area), features_dir / "floor_area.gpkg")
     return aggregate_series(floor_area, "floor_area", num_quantiles)

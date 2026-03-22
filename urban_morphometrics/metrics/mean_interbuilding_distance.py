@@ -16,6 +16,8 @@ reset to a RangeIndex before building the graphs and calling momepy, then map re
 back to focal buildings via a positional mask.
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 from libpysal.graph import Graph
@@ -23,10 +25,11 @@ from libpysal.graph import Graph
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics.features import write_features
 
 
 @register("mean_interbuilding_distance")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Mean distance from each building to all neighbours in its Delaunay+KNN cluster (m)."""
     b = ctx.buildings_ea
     if b.empty:
@@ -78,4 +81,7 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     # Step 5: map positional results (0..M-1) back to original OSM IDs
     osm_ids_surviving = all_b.index[del_positions]
     values_mapped = pd.Series(values_m.values, index=osm_ids_surviving)
-    return aggregate_series(values_mapped.reindex(b.index), "mean_interbuilding_distance", num_quantiles)
+    focal_values = values_mapped.reindex(b.index)
+    if features_dir is not None:
+        write_features(b[["geometry"]].assign(mean_interbuilding_distance=focal_values), features_dir / "mean_interbuilding_distance.gpkg")
+    return aggregate_series(focal_values, "mean_interbuilding_distance", num_quantiles)

@@ -13,16 +13,19 @@ Requires neighbourhood context so both buildings and streets near the cell
 boundary can find their true nearest counterparts.
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 
 from urban_morphometrics.cell_context import CellContext
 from urban_morphometrics.metrics import register
 from urban_morphometrics.metrics.aggregation import aggregate_series
+from urban_morphometrics.metrics.features import write_features
 
 
 @register("street_alignment")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Deviation between each building's orientation and its nearest street (°)."""
     b = ctx.buildings_ea
     if b.empty:
@@ -40,4 +43,7 @@ def compute(ctx: CellContext, num_quantiles: int) -> dict:
     street_orient = momepy.orientation(streets)
 
     values = momepy.street_alignment(building_orient, street_orient, nearest)
-    return aggregate_series(values.reindex(b.index), "street_alignment", num_quantiles)
+    focal_values = values.reindex(b.index)
+    if features_dir is not None:
+        write_features(b[["geometry"]].assign(street_alignment=focal_values), features_dir / "street_alignment.gpkg")
+    return aggregate_series(focal_values, "street_alignment", num_quantiles)

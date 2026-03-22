@@ -9,6 +9,8 @@ so no aggregation is applied. Returns NaN when the graph has too few nodes to
 form a valid circuit (fewer than 3 nodes).
 """
 
+from pathlib import Path
+
 import pandas as pd
 import momepy
 
@@ -23,7 +25,7 @@ def _compute(graph) -> float:
 
 
 @register("meshedness_global")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Global meshedness (E-N+1)/(2N-5) for vehicle and pedestrian networks."""
     return {
         "meshedness_global_vehicle": _compute(ctx.vehicle_graph),

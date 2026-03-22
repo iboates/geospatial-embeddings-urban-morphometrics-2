@@ -9,6 +9,8 @@ Computed as a single scalar per graph (vehicle and pedestrian). Returns NaN
 when the graph has fewer than 3 nodes.
 """
 
+from pathlib import Path
+
 import momepy
 
 from urban_morphometrics.cell_context import CellContext
@@ -22,7 +24,7 @@ def _compute(graph) -> float:
 
 
 @register("gamma_global")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Global gamma E/(3(N-2)) for vehicle and pedestrian networks."""
     return {
         "gamma_global_vehicle": _compute(ctx.vehicle_graph),

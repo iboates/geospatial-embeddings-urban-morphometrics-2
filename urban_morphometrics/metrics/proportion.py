@@ -15,6 +15,8 @@ type per cell), not per node.
 Requires node degree to be set; this is computed inline before calling momepy.
 """
 
+from pathlib import Path
+
 import momepy
 
 from urban_morphometrics.cell_context import CellContext
@@ -40,7 +42,7 @@ def _compute(graph, suffix: str) -> dict:
 
 
 @register("proportion")
-def compute(ctx: CellContext, num_quantiles: int) -> dict:
+def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = None) -> dict:
     """Proportion of 3-way, 4-way, and dead-end nodes for vehicle and pedestrian networks."""
     row = {}
     row.update(_compute(ctx.vehicle_graph, "vehicle"))
