@@ -61,7 +61,7 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
 
     Dissolves touching buildings (focal + neighbourhood) into unified structures
     and measures the area of each interior courtyard ring that intersects a
-    focal building. Also records the total courtyard count.
+    focal building
     All areas are in square metres (equal-area CRS).
     """
     b = ctx.buildings_ea
@@ -76,5 +76,4 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
         )
         write_features(courtyard_gdf, features_dir / "courtyard_area.gpkg")
     result = aggregate_series(courtyard_areas, "courtyard_area", num_quantiles)
-    result["courtyard_area_count"] = len(courtyard_areas)
     return result
