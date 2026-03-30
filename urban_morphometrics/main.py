@@ -170,6 +170,7 @@ def compute_urban_morphometrics(
         metrics_cache = cell_cache_dir / "_metrics.parquet"
         if use_cache and metrics_cache.exists():
             return region_id, row.geometry, pd.read_parquet(metrics_cache).iloc[0].to_dict()
+        cell_features_dir = (features_dir / str(region_id)) if export_features else None
         ctx = CellContext(
             region_id=region_id,
             cell_geometry=row.geometry,
@@ -180,8 +181,8 @@ def compute_urban_morphometrics(
             conformal_crs=conformal_crs,
             cache_dir=cell_cache_dir,
             config=cfg,
+            features_dir=cell_features_dir,
         )
-        cell_features_dir = (features_dir / str(region_id)) if export_features else None
         metric_row = compute_metrics(ctx, metrics, num_quantiles, features_dir=cell_features_dir)
         if use_cache:
             pd.DataFrame([metric_row]).to_parquet(metrics_cache)

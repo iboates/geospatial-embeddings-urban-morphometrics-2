@@ -15,6 +15,7 @@ filter results back to focal nodes before aggregating.
 """
 
 import logging
+from pathlib import Path
 
 import momepy
 import pandas as pd
@@ -26,41 +27,66 @@ from urban_morphometrics.metrics._utils import (
 log = logging.getLogger(__name__)
 
 
-def build_vehicle_graph(highways_gdf):
+def build_vehicle_graph(highways_gdf, save_dir: Path | None = None):
     """Build a directed primal NetworkX graph from a vehicle highways GeoDataFrame.
 
     Edges respect the boolean 'oneway' column: one-way segments produce a single
     directed edge; bidirectional segments produce edges in both directions.
 
+    When save_dir is provided the cleaned street GeoDataFrame and the extracted
+    node GeoDataFrame are written as GeoPackages to that directory.
+
     Returns None if the GeoDataFrame is empty.
     """
     if highways_gdf.empty:
         return None
     cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
-    return momepy.gdf_to_nx(cleaned, directed=True, oneway_column="oneway")
+    if save_dir is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+        cleaned.to_file(save_dir / "cleaned_vehicle_streets.gpkg", driver="GPKG")
+    graph = momepy.gdf_to_nx(cleaned, directed=True, oneway_column="oneway")
+    if save_dir is not None:
+        nodes_gdf(graph, save_dir=save_dir / "vehicle_nodes.gpkg")
+    return graph
 
 
-def build_pedestrian_graph(highways_gdf):
+def build_pedestrian_graph(highways_gdf, save_dir: Path | None = None):
     """Build an undirected primal NetworkX graph from a pedestrian highways GeoDataFrame.
 
     All segments are treated as bidirectional regardless of any oneway tag.
 
+    When save_dir is provided the cleaned street GeoDataFrame and the extracted
+    node GeoDataFrame are written as GeoPackages to that directory.
+
     Returns None if the GeoDataFrame is empty.
     """
     if highways_gdf.empty:
         return None
     cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
-    return momepy.gdf_to_nx(cleaned, directed=False)
+    if save_dir is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+        cleaned.to_file(save_dir / "cleaned_pedestrian_streets.gpkg", driver="GPKG")
+    graph = momepy.gdf_to_nx(cleaned, directed=False)
+    if save_dir is not None:
+        nodes_gdf(graph, save_dir=save_dir / "pedestrian_nodes.gpkg")
+    return graph
 
 
-def nodes_gdf(graph):
+def nodes_gdf(graph, save_dir: "Path | str | None" = None):
     """Extract node positions and attributes from a momepy primal graph as a GeoDataFrame.
 
     Returns a GeoDataFrame with one row per node, a Point geometry column, and any
     metric attributes added to the graph by momepy metric functions.
     momepy.nx_to_gdf always returns a (nodes, edges) tuple; we take only nodes.
+
+    When save_dir is provided the node GeoDataFrame is written as a GeoPackage to
+    that path (treated as a file path, not a directory).
     """
     nodes, _ = momepy.nx_to_gdf(graph)
+    if save_dir is not None:
+        save_path = Path(save_dir)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        nodes.to_file(save_path, driver="GPKG")
     return nodes
 
 

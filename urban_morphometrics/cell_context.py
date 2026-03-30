@@ -62,6 +62,7 @@ class CellContext:
         conformal_crs: str,
         cache_dir: Path,
         config: "MetricConfig | None" = None,
+        features_dir: "Path | None" = None,
     ):
         self.region_id = region_id
         self._cell_geometry = cell_geometry
@@ -73,6 +74,7 @@ class CellContext:
         self._cache_dir = cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
         self.config = config if config is not None else MetricConfig()
+        self._features_dir = features_dir
 
     # ------------------------------------------------------------------
     # Cache helpers
@@ -445,7 +447,7 @@ class CellContext:
         from urban_morphometrics.street_graph import build_vehicle_graph
 
         streets = self.focal_plus_neighbourhood_vehicle_highways.to_crs(self._ed_crs)
-        return build_vehicle_graph(streets)
+        return build_vehicle_graph(streets, save_dir=self._features_dir)
 
     @cached_property
     def pedestrian_graph(self):
@@ -457,4 +459,4 @@ class CellContext:
         from urban_morphometrics.street_graph import build_pedestrian_graph
 
         streets = self.focal_plus_neighbourhood_pedestrian_highways.to_crs(self._ed_crs)
-        return build_pedestrian_graph(streets)
+        return build_pedestrian_graph(streets, save_dir=self._features_dir)
