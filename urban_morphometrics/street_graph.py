@@ -46,7 +46,9 @@ def build_vehicle_graph(highways_gdf, save_dir: Path | None = None):
         cleaned.to_file(save_dir / "cleaned_vehicle_streets.gpkg", driver="GPKG")
     graph = momepy.gdf_to_nx(cleaned, directed=True, oneway_column="oneway")
     if save_dir is not None:
-        nodes_gdf(graph, save_dir=save_dir / "vehicle_nodes.gpkg")
+        nodes, edges = momepy.nx_to_gdf(graph)
+        nodes.to_file(save_dir / "vehicle_graph_nodes.gpkg", driver="GPKG")
+        edges.to_file(save_dir / "vehicle_graph_edges.gpkg", driver="GPKG")
     return graph
 
 
@@ -68,7 +70,9 @@ def build_pedestrian_graph(highways_gdf, save_dir: Path | None = None):
         cleaned.to_file(save_dir / "cleaned_pedestrian_streets.gpkg", driver="GPKG")
     graph = momepy.gdf_to_nx(cleaned, directed=False)
     if save_dir is not None:
-        nodes_gdf(graph, save_dir=save_dir / "pedestrian_nodes.gpkg")
+        nodes, edges = momepy.nx_to_gdf(graph)
+        nodes.to_file(save_dir / "pedestrian_graph_nodes.gpkg", driver="GPKG")
+        edges.to_file(save_dir / "pedestrian_graph_edges.gpkg", driver="GPKG")
     return graph
 
 

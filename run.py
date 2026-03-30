@@ -27,7 +27,7 @@ def run_main():
         neighbourhood_distance=200,
         num_quantiles=4,
         metric_config=metric_config,
-        # metrics=["mean_node_dist"],
+        # metrics=["centroid_corner_distance"],
         debug=True,
         output_folder="/mnt/c/Users/Isaac/Downloads/urban_morphometrics",
         use_cache=False,

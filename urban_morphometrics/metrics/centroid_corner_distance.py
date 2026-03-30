@@ -3,7 +3,7 @@
 Mean and standard deviation of distances from the building centroid to each
 vertex. Captures both size and irregularity of the footprint. Computed twice:
 - Raw buildings: prefixes `ccd_mean` and `ccd_std`
-- Dissolved structures: prefixes `ccd_mean_joined` and `ccd_std_joined`
+- Dissolved structures: prefixes `ccd_joined_mean` and `ccd_joined_std`
 
 momepy.centroid_corner_distance returns a DataFrame with 'mean' and 'std' columns;
 each column is aggregated independently.
@@ -53,16 +53,16 @@ def compute(ctx: CellContext, num_quantiles: int, features_dir: Path | None = No
         return {
             **aggregate_series(empty, "ccd_mean", num_quantiles),
             **aggregate_series(empty, "ccd_std", num_quantiles),
-            **aggregate_series(empty, "ccd_mean_joined", num_quantiles),
-            **aggregate_series(empty, "ccd_std_joined", num_quantiles),
+            **aggregate_series(empty, "ccd_joined_mean", num_quantiles),
+            **aggregate_series(empty, "ccd_joined_std", num_quantiles),
         }
 
     result = _aggregate_ccd(b, "ccd", num_quantiles, features_dir)
 
     dissolved = ctx.dissolved_buildings_ea
     result.update(_aggregate_ccd(dissolved, "ccd_joined", num_quantiles, features_dir) if not dissolved.empty else {
-        **aggregate_series(pd.Series(dtype=float), "ccd_mean_joined", num_quantiles),
-        **aggregate_series(pd.Series(dtype=float), "ccd_std_joined", num_quantiles),
+        **aggregate_series(pd.Series(dtype=float), "ccd_joined_mean", num_quantiles),
+        **aggregate_series(pd.Series(dtype=float), "ccd_joined_std", num_quantiles),
     })
 
     return result
