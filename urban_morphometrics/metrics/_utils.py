@@ -4,7 +4,9 @@ from collections import defaultdict
 
 import geopandas as gpd
 import pandas as pd
+from shapely.geometry import LineString, Point
 from shapely.ops import linemerge, unary_union
+from shapely.strtree import STRtree
 
 _COORD_ROUND = 8
 
@@ -14,6 +16,130 @@ def _endpoints(geom):
     s = (round(coords[0][0], _COORD_ROUND), round(coords[0][1], _COORD_ROUND))
     e = (round(coords[-1][0], _COORD_ROUND), round(coords[-1][1], _COORD_ROUND))
     return s, e
+
+
+def _cut_line(line: LineString, distances: list[float]) -> list[LineString]:
+    """Split a LineString at the given distances (metres) along it.
+
+    Distances outside (0, line.length) and duplicates closer than 1e-6 m are
+    ignored. Returns a list of LineString pieces; if no valid cuts exist the
+    original line is returned as a single-element list.
+    """
+    cuts = sorted(d for d in set(distances) if 0.0 < d < line.length)
+    deduped: list[float] = []
+    for d in cuts:
+        if not deduped or d - deduped[-1] > 1e-6:
+            deduped.append(d)
+    if not deduped:
+        return [line]
+
+    # Strip Z so all coords are (x, y)
+    coords = [c[:2] for c in line.coords]
+
+    # Cumulative distances at each vertex
+    cum = [0.0]
+    for i in range(len(coords) - 1):
+        dx = coords[i + 1][0] - coords[i][0]
+        dy = coords[i + 1][1] - coords[i][1]
+        cum.append(cum[-1] + (dx * dx + dy * dy) ** 0.5)
+
+    pieces: list[LineString] = []
+    current = [coords[0]]
+    seg_i = 0
+
+    for cut_d in deduped:
+        # Walk forward through segments until the segment containing cut_d
+        while seg_i < len(coords) - 2 and cum[seg_i + 1] <= cut_d:
+            seg_i += 1
+            current.append(coords[seg_i])
+
+        seg_span = cum[seg_i + 1] - cum[seg_i]
+        if seg_span < 1e-12:
+            continue  # degenerate segment; skip
+        t = (cut_d - cum[seg_i]) / seg_span
+        cx = coords[seg_i][0] + t * (coords[seg_i + 1][0] - coords[seg_i][0])
+        cy = coords[seg_i][1] + t * (coords[seg_i + 1][1] - coords[seg_i][1])
+        split_pt = (cx, cy)
+
+        current.append(split_pt)
+        if len(current) >= 2:
+            pieces.append(LineString(current))
+        current = [split_pt]
+
+    # Remaining vertices from seg_i+1 to end
+    current.extend(coords[seg_i + 1 :])
+    if len(current) >= 2:
+        pieces.append(LineString(current))
+
+    return pieces if pieces else [line]
+
+
+def split_lines_at_endpoints(gdf: gpd.GeoDataFrame, tolerance: float = 0.1) -> gpd.GeoDataFrame:
+    """Split line segments wherever an endpoint of another line falls on them.
+
+    Repairs T-junction topology: when a street endpoint lands on the interior
+    of another street (within *tolerance* CRS units) the second street is split
+    at that point so the resulting graph correctly represents the intersection.
+
+    The *tolerance* controls both the snap search radius and the minimum distance
+    from an existing endpoint before a split is triggered (endpoints that are
+    already shared are left alone).
+
+    All non-geometry columns are inherited by every piece produced by a split.
+
+    Args:
+        gdf:       Highway GeoDataFrame with LineString geometries.
+        tolerance: Maximum distance (CRS units, metres for projected CRS) from
+                   an endpoint to a candidate line for a split to be triggered.
+
+    Returns:
+        GeoDataFrame with split rows inserted; row count ≥ len(gdf).
+    """
+    geometries = list(gdf.geometry)
+    tree = STRtree(geometries)
+    geom_col = gdf.geometry.name
+
+    # split_distances[positional_index] = list of distances along that line
+    split_distances: dict[int, list[float]] = defaultdict(list)
+
+    for src_idx, src_geom in enumerate(geometries):
+        src_coords = list(src_geom.coords)
+        endpoints = [Point(src_coords[0][:2]), Point(src_coords[-1][:2])]
+
+        for ep in endpoints:
+            for cand_idx in tree.query(ep.buffer(tolerance)):
+                if cand_idx == src_idx:
+                    continue
+                cand_geom = geometries[cand_idx]
+                if ep.distance(cand_geom) > tolerance:
+                    continue
+
+                # Skip if this endpoint already coincides with an endpoint of the
+                # candidate (shared node — no split needed)
+                cand_coords = list(cand_geom.coords)
+                if ep.distance(Point(cand_coords[0][:2])) <= tolerance:
+                    continue
+                if ep.distance(Point(cand_coords[-1][:2])) <= tolerance:
+                    continue
+
+                split_distances[cand_idx].append(cand_geom.project(ep))
+
+    if not split_distances:
+        return gdf
+
+    rows = []
+    for pos_idx in range(len(gdf)):
+        row = gdf.iloc[pos_idx]
+        if pos_idx not in split_distances:
+            rows.append(row)
+        else:
+            for piece in _cut_line(row[geom_col], split_distances[pos_idx]):
+                new_row = row.copy()
+                new_row[geom_col] = piece
+                rows.append(new_row)
+
+    result = gpd.GeoDataFrame(rows, crs=gdf.crs).reset_index(drop=True)
+    return result.set_geometry(geom_col)
 
 
 def remove_interstitial_nodes_preserving_oneway(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

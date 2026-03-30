@@ -9,6 +9,7 @@ def run_main():
     regionalizer = H3Regionalizer(resolution=9)
     regions_gdf = regionalizer.transform(region_gdf)
     print(f"Number of cells: {len(regions_gdf)}")
+    regions_gdf.to_file("/mnt/c/Users/Isaac/Downloads/urban_morphometrics/regions.gpkg")
     
     metric_config = {
         "knn_k": 15,
@@ -23,7 +24,7 @@ def run_main():
     compute_urban_morphometrics(
         study_area_gdf=regions_gdf,
         pbf_path=pbf_url,
-        run_name="my_run9",
+        run_name="suedstadt_00",
         neighbourhood_distance=200,
         num_quantiles=4,
         metric_config=metric_config,
@@ -32,7 +33,7 @@ def run_main():
         output_folder="/mnt/c/Users/Isaac/Downloads/urban_morphometrics",
         use_cache=False,
         export_features=True,
-        n_workers=1
+        n_workers=4
     )
 
 if __name__ == "__main__":

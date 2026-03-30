@@ -164,6 +164,8 @@ def compute_urban_morphometrics(
         osm_data.buildings.to_file(debug_dir / "buildings.gpkg", driver="GPKG")
         osm_data.highways.to_file(debug_dir / "highways.gpkg", driver="GPKG")
         osm_data.landuse.to_file(debug_dir / "landuse.gpkg", driver="GPKG")
+        osm_data.water.to_file(debug_dir / "water.gpkg", driver="GPKG")
+        osm_data.pedestrian_areas.to_file(debug_dir / "pedestrian_areas.gpkg", driver="GPKG")
 
     def _process_cell(region_id, row):
         cell_cache_dir = cache_dir / str(region_id)

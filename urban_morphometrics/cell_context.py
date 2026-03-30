@@ -256,6 +256,30 @@ class CellContext:
             ].to_crs(self._ea_crs),
         )
 
+    @cached_property
+    def water_ea(self) -> gpd.GeoDataFrame:
+        """Focal water polygons (natural=water) in equal-area CRS."""
+        return self._load_or_compute(
+            "water_ea",
+            lambda: self._osm_data.water.loc[
+                self._osm_data.water.index[
+                    self._osm_data.water.intersects(self._cell_geometry)
+                ]
+            ].to_crs(self._ea_crs),
+        )
+
+    @cached_property
+    def pedestrian_areas_ea(self) -> gpd.GeoDataFrame:
+        """Focal pedestrian area polygons (highway=pedestrian areas) in equal-area CRS."""
+        return self._load_or_compute(
+            "pedestrian_areas_ea",
+            lambda: self._osm_data.pedestrian_areas.loc[
+                self._osm_data.pedestrian_areas.index[
+                    self._osm_data.pedestrian_areas.intersects(self._cell_geometry)
+                ]
+            ].to_crs(self._ea_crs),
+        )
+
     # ------------------------------------------------------------------
     # Neighbourhood layers
     # ------------------------------------------------------------------
@@ -447,7 +471,7 @@ class CellContext:
         from urban_morphometrics.street_graph import build_vehicle_graph
 
         streets = self.focal_plus_neighbourhood_vehicle_highways.to_crs(self._ed_crs)
-        return build_vehicle_graph(streets, save_dir=self._features_dir)
+        return build_vehicle_graph(streets, save_dir=self._features_dir, tolerance=self.config.graph_endpoint_snap_tolerance)
 
     @cached_property
     def pedestrian_graph(self):
@@ -459,4 +483,4 @@ class CellContext:
         from urban_morphometrics.street_graph import build_pedestrian_graph
 
         streets = self.focal_plus_neighbourhood_pedestrian_highways.to_crs(self._ed_crs)
-        return build_pedestrian_graph(streets, save_dir=self._features_dir)
+        return build_pedestrian_graph(streets, save_dir=self._features_dir, tolerance=self.config.graph_endpoint_snap_tolerance)

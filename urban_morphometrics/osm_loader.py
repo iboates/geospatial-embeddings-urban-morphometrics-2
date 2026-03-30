@@ -44,6 +44,8 @@ class OsmData:
     buildings: gpd.GeoDataFrame
     highways: gpd.GeoDataFrame
     landuse: gpd.GeoDataFrame
+    water: gpd.GeoDataFrame
+    pedestrian_areas: gpd.GeoDataFrame
 
 
 def load_osm_data(pbf_path: Path, study_area_gdf: gpd.GeoDataFrame) -> OsmData:
@@ -62,9 +64,11 @@ def load_osm_data(pbf_path: Path, study_area_gdf: gpd.GeoDataFrame) -> OsmData:
     geometry_filter = study_area_gdf.geometry.union_all()
 
     layers = [
-        ("buildings", {"building": True, "building:levels": True, "height": True}, _keep_polygons),
-        ("highways",  {"highway": True, "oneway": True},                           _keep_lines),
-        ("landuse",   {"landuse": True},                                           _keep_polygons),
+        ("buildings",         {"building": True, "building:levels": True, "height": True}, _keep_polygons),
+        ("highways",          {"highway": True, "oneway": True},                           _keep_lines),
+        ("landuse",           {"landuse": True},                                           _keep_polygons),
+        ("water",             {"natural": "water"},                                        _keep_polygons),
+        ("pedestrian_areas",  {"highway": "pedestrian"},                                   _keep_polygons),
     ]
 
     results = {}

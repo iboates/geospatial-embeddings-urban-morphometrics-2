@@ -22,25 +22,31 @@ import pandas as pd
 
 from urban_morphometrics.metrics._utils import (
     remove_interstitial_nodes_preserving_oneway,
+    split_lines_at_endpoints,
 )
 
 log = logging.getLogger(__name__)
 
 
-def build_vehicle_graph(highways_gdf, save_dir: Path | None = None):
+def build_vehicle_graph(highways_gdf, save_dir: Path | None = None, tolerance: float = 0.1):
     """Build a directed primal NetworkX graph from a vehicle highways GeoDataFrame.
 
     Edges respect the boolean 'oneway' column: one-way segments produce a single
     directed edge; bidirectional segments produce edges in both directions.
 
-    When save_dir is provided the cleaned street GeoDataFrame and the extracted
-    node GeoDataFrame are written as GeoPackages to that directory.
+    Before graph construction, endpoints that fall on the interior of another
+    segment (within *tolerance* metres) trigger a split so that T-junctions are
+    correctly represented as degree-3 nodes. Set tolerance=0 to skip this step.
+
+    When save_dir is provided the cleaned street GeoDataFrame and graph node/edge
+    GeoPackages are written to that directory.
 
     Returns None if the GeoDataFrame is empty.
     """
     if highways_gdf.empty:
         return None
-    cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
+    split = split_lines_at_endpoints(highways_gdf, tolerance) if tolerance > 0 else highways_gdf
+    cleaned = remove_interstitial_nodes_preserving_oneway(split)
     if save_dir is not None:
         save_dir.mkdir(parents=True, exist_ok=True)
         cleaned.to_file(save_dir / "cleaned_vehicle_streets.gpkg", driver="GPKG")
@@ -52,19 +58,24 @@ def build_vehicle_graph(highways_gdf, save_dir: Path | None = None):
     return graph
 
 
-def build_pedestrian_graph(highways_gdf, save_dir: Path | None = None):
+def build_pedestrian_graph(highways_gdf, save_dir: Path | None = None, tolerance: float = 0.1):
     """Build an undirected primal NetworkX graph from a pedestrian highways GeoDataFrame.
 
     All segments are treated as bidirectional regardless of any oneway tag.
 
-    When save_dir is provided the cleaned street GeoDataFrame and the extracted
-    node GeoDataFrame are written as GeoPackages to that directory.
+    Before graph construction, endpoints that fall on the interior of another
+    segment (within *tolerance* metres) trigger a split so that T-junctions are
+    correctly represented as degree-3 nodes. Set tolerance=0 to skip this step.
+
+    When save_dir is provided the cleaned street GeoDataFrame and graph node/edge
+    GeoPackages are written to that directory.
 
     Returns None if the GeoDataFrame is empty.
     """
     if highways_gdf.empty:
         return None
-    cleaned = remove_interstitial_nodes_preserving_oneway(highways_gdf)
+    split = split_lines_at_endpoints(highways_gdf, tolerance) if tolerance > 0 else highways_gdf
+    cleaned = remove_interstitial_nodes_preserving_oneway(split)
     if save_dir is not None:
         save_dir.mkdir(parents=True, exist_ok=True)
         cleaned.to_file(save_dir / "cleaned_pedestrian_streets.gpkg", driver="GPKG")

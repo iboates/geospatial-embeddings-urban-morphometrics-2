@@ -88,6 +88,10 @@ def _load_metrics():
         gamma_global,
         meshedness_global,
         proportion,
+        # Land cover metrics (step 13)
+        landuse_cover,
+        water_cover,
+        pedestrian_area_cover,
     )
 
 _load_metrics()

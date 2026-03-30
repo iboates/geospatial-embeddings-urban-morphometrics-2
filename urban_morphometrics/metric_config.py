@@ -66,6 +66,13 @@ class MetricConfig:
         least as wide as the widest street canyon expected; ticks that reach
         no building on one side count as open.
         Default: 50.
+    graph_endpoint_snap_tolerance:
+        Maximum distance (metres) between a street endpoint and another street
+        segment for a topological split to be triggered. When an endpoint falls
+        within this radius of another segment's interior (and is not already a
+        shared endpoint), that segment is split at the projected point so the
+        graph correctly represents the T-junction. Set to 0 to disable splitting.
+        Default: 0.1.
     """
 
     knn_k: int = 15
@@ -78,6 +85,7 @@ class MetricConfig:
     network_subgraph_radius: int = 5
     street_profile_distance: float = 10.0
     street_profile_tick_length: float = 50.0
+    graph_endpoint_snap_tolerance: float = 0.1
 
     @classmethod
     def from_dict(cls, d: dict) -> "MetricConfig":
