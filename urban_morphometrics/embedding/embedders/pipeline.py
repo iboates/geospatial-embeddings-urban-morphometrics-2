@@ -91,13 +91,13 @@ def run_embedding_pipeline(
     morpho_all = compute_urban_morphometrics(
         study_area_gdf=combined,
         pbf_path=None,
-        run_name="king_county",
+        run_name="chicago_00",
         output_folder="urban_morphometrics",
         num_quantiles=4,
-        equal_area_crs="EPSG:5070",
-        equidistant_crs="EPSG:2926",
-        conformal_crs="EPSG:2926",
-        n_workers=10,
+        equal_area_crs="ESRI:102008",
+        equidistant_crs="EPSG:23304",
+        conformal_crs="EPSG:23304",
+        n_workers=4,
     )
 
     # Load OSM features
