@@ -98,7 +98,7 @@ def compute_urban_morphometrics(
     metric_config: "dict | MetricConfig | None" = None,
     export_features: bool = False,
     n_workers: int = 1,
-) -> None:
+) -> gpd.GeoDataFrame:
     """Compute urban morphology metrics for a study area from OSM data.
 
     Args:
@@ -239,6 +239,7 @@ def compute_urban_morphometrics(
     out_path = results_dir / "metrics.gpkg"
     results_gdf.to_file(out_path, driver="GPKG")
     log.info("Results written to %s", out_path)
+    return results_gdf
 
 
 def _build_parser() -> argparse.ArgumentParser:
