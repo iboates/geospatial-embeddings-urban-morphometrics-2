@@ -337,17 +337,26 @@ class CellContext:
     @cached_property
     def focal_plus_neighbourhood_buildings(self) -> gpd.GeoDataFrame:
         """Focal and neighbourhood buildings combined, in equal-area CRS."""
-        return pd.concat([self.buildings_ea, self.neighbourhood_buildings])
+        result = pd.concat([self.buildings_ea, self.neighbourhood_buildings])
+        if result.index.duplicated().any():
+            result = result[~result.index.duplicated(keep="first")]
+        return result
 
     @cached_property
     def focal_plus_neighbourhood_vehicle_highways(self) -> gpd.GeoDataFrame:
         """Focal and neighbourhood vehicle highways combined, in equal-area CRS."""
-        return pd.concat([self.vehicle_highways_ea, self.neighbourhood_vehicle_highways])
+        result = pd.concat([self.vehicle_highways_ea, self.neighbourhood_vehicle_highways])
+        if result.index.duplicated().any():
+            result = result[~result.index.duplicated(keep="first")]
+        return result
 
     @cached_property
     def focal_plus_neighbourhood_pedestrian_highways(self) -> gpd.GeoDataFrame:
         """Focal and neighbourhood pedestrian highways combined, in equal-area CRS."""
-        return pd.concat([self.pedestrian_highways_ea, self.neighbourhood_pedestrian_highways])
+        result = pd.concat([self.pedestrian_highways_ea, self.neighbourhood_pedestrian_highways])
+        if result.index.duplicated().any():
+            result = result[~result.index.duplicated(keep="first")]
+        return result
 
     # ------------------------------------------------------------------
     # Shared spatial graphs (in-memory only; not persisted to Parquet)
@@ -397,7 +406,13 @@ class CellContext:
         all_b = self.focal_plus_neighbourhood_buildings
         if all_b.empty:
             return None
-        return Graph.build_contiguity(all_b, rook=True)
+        try:
+            return Graph.build_contiguity(all_b, rook=True)
+        except Exception:
+            log.warning(
+                "Contiguity graph construction failed for region %s", self.region_id, exc_info=True
+            )
+            return None
 
     @cached_property
     def tessellation(self):
