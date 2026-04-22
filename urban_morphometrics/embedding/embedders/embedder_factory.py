@@ -18,6 +18,10 @@ EMBEDDER_REGISTRY: dict[str, tuple[str, str]] = {
     "GeoVex": ("srai.embedders", "GeoVexEmbedder"),
     "CountEmbedder": ("srai.embedders", "CountEmbedder"),
     "ContextualCountEmbedder": ("srai.embedders", "ContextualCountEmbedder"),
+    "UrbanMorphometricsEmbedder": (
+        "urban_morphometrics.embedding.embedders.urban_morphometrics_embedder",
+        "UrbanMorphometricsEmbedder",
+    ),
     # ← Add more embedders here
 }
 

@@ -14,7 +14,7 @@ import warnings
 from typing import Any
 
 import geopandas as gpd
-from shapely.ops import unary_union
+import pandas as pd
 from srai.h3 import ring_buffer_h3_regions_gdf
 from srai.joiners import IntersectionJoiner
 from srai.loaders.osm_loaders import OSMPbfLoader
@@ -22,6 +22,7 @@ from srai.loaders.osm_loaders.filters import HEX2VEC_FILTER
 from srai.neighbourhoods.h3_neighbourhood import H3Neighbourhood
 
 from urban_morphometrics.embedding.embedders.embedder_factory import requires_fit
+from urban_morphometrics.main import compute_urban_morphometrics
 
 logger = logging.getLogger(__name__)
 
@@ -67,31 +68,58 @@ def run_embedding_pipeline(
     buf_dev = ring_buffer_h3_regions_gdf(regions_dev, neighbourhood_radius)
     buf_test = ring_buffer_h3_regions_gdf(regions_test, neighbourhood_radius)
 
+    # combined = gpd.GeoDataFrame(
+    #     geometry=[
+    #         unary_union(
+    #             list(buf_train.geometry)
+    #             + list(buf_dev.geometry)
+    #             + list(buf_test.geometry)
+    #         )
+    #     ],
+    #     crs=buf_train.crs,
+    # )
     combined = gpd.GeoDataFrame(
-        geometry=[
-            unary_union(
-                list(full_regions.geometry)
-                + list(buf_dev.geometry)
-                + list(buf_test.geometry)
-            )
-        ],
-        crs=full_regions.crs,
+        pd.concat([buf_train, buf_dev, buf_test], ignore_index=False), crs=buf_train.crs
     )
+
+    combined = combined[~combined.index.duplicated(keep="first")]
+
     logger.info("Loading OSM features for combined region (single pass)...")
-    osm_all = loader.load(combined, osm_filter)
+
+    # Compute Urban Morphometrics
+    logger.info("Loading Urban Morphometrics features for all regions...")
+    morpho_all = compute_urban_morphometrics(
+        study_area_gdf=combined,
+        pbf_path=None,
+        run_name="king_county",
+        output_folder="urban_morphometrics",
+        num_quantiles=4,
+        equal_area_crs="EPSG:5070",
+        equidistant_crs="EPSG:2926",
+        conformal_crs="EPSG:2926",
+        n_workers=10,
+    )
 
     # Load OSM features
-    logger.info("Loading OSM features for train regions...")
-    # osm_train = loader.load(full_regions, osm_filter)
-    joint_train = joiner.transform(buf_train, osm_all)
+    logger.info("Loading OSM features for all regions...")
+    osm_all = loader.load(combined, osm_filter)
 
-    logger.info("Loading OSM features for dev regions...")
-    # osm_dev = loader.load(buf_dev, osm_filter)
-    joint_dev = joiner.transform(buf_dev, osm_all)
+    features_all = osm_all.join(morpho_all, how="outer")
 
-    logger.info("Loading OSM features for test regions...")
-    # osm_test = loader.load(buf_test, osm_filter)
-    joint_test = joiner.transform(buf_test, osm_all)
+    print(osm_all.head())
+
+    print(morpho_all.head())
+
+    print(features_all.head())
+
+    logger.info("Joining OSM features for train regions...")
+    joint_train = joiner.transform(buf_train, features_all)
+
+    logger.info("Joining OSM features for dev regions...")
+    joint_dev = joiner.transform(buf_dev, features_all)
+
+    logger.info("Joining OSM features for test regions...")
+    joint_test = joiner.transform(buf_test, features_all)
 
     # Fit (if needed)
     if requires_fit(embedder_name):
