@@ -436,12 +436,22 @@ class CellContext:
         if len(all_b) < 2:
             return None
         try:
-            clip = momepy.buffered_limit(
-                all_b,
-                buffer=self.config.tessellation_buffer,
-                min_buffer=self.config.tessellation_min_buffer,
-                max_buffer=self.config.tessellation_max_buffer
-            )
+            try:
+                clip = momepy.buffered_limit(
+                    all_b,
+                    buffer=self.config.tessellation_buffer,
+                    min_buffer=self.config.tessellation_min_buffer,
+                    max_buffer=self.config.tessellation_max_buffer
+                )
+            except Exception:
+                # buffered_limit uses Gabriel triangulation on centroids and fails
+                # when buildings have coincident centroids (coplanar points).
+                # Fall back to a uniform buffer around all buildings as the clip boundary.
+                log.debug(
+                    "buffered_limit failed for region %s, using uniform buffer fallback",
+                    self.region_id,
+                )
+                clip = all_b.buffer(self.config.tessellation_buffer).union_all()
             result = momepy.morphological_tessellation(
                 all_b,
                 clip=clip,
