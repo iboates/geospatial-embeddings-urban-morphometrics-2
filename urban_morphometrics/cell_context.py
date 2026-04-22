@@ -436,7 +436,7 @@ class CellContext:
             return gpd.read_parquet(path)
 
         all_b = self.focal_plus_neighbourhood_buildings
-        if len(all_b) < 2:
+        if len(all_b) < 3:
             return None
         try:
             try:
@@ -447,14 +447,15 @@ class CellContext:
                     max_buffer=self.config.tessellation_max_buffer
                 )
             except Exception:
-                # buffered_limit uses Gabriel triangulation on centroids and fails
-                # when buildings have coincident centroids (coplanar points).
-                # Fall back to a uniform buffer around all buildings as the clip boundary.
+                # buffered_limit uses Gabriel triangulation internally and fails
+                # with too few buildings or coincident centroids. Fall back to a
+                # uniform buffer; use max_buffer as the numeric distance since
+                # tessellation_buffer may be the string "adaptive".
                 log.debug(
                     "buffered_limit failed for region %s, using uniform buffer fallback",
                     self.region_id,
                 )
-                clip = all_b.buffer(self.config.tessellation_buffer).union_all()
+                clip = all_b.buffer(self.config.tessellation_max_buffer).union_all()
             result = momepy.morphological_tessellation(
                 all_b,
                 clip=clip,

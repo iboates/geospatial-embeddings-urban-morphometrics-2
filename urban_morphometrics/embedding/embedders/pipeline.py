@@ -93,12 +93,13 @@ def run_embedding_pipeline(
         pbf_path=None,
         run_name="chicago_00",
         output_folder="urban_morphometrics",
+        neighbourhood_distance=300,
         num_quantiles=4,
         equal_area_crs="ESRI:102008",
         equidistant_crs="EPSG:23304",
         conformal_crs="EPSG:23304",
-        n_workers=4,
-        use_cache=False,
+        n_workers=8,
+        use_cache=True,
         debug=True
     )
 
