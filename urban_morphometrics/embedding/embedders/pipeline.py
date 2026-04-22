@@ -98,6 +98,8 @@ def run_embedding_pipeline(
         equidistant_crs="EPSG:23304",
         conformal_crs="EPSG:23304",
         n_workers=4,
+        use_cache=False,
+        debug=True
     )
 
     # Load OSM features

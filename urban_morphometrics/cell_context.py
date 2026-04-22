@@ -86,9 +86,12 @@ class CellContext:
     def _load_or_compute(self, name: str, compute_fn) -> gpd.GeoDataFrame:
         path = self._cache_path(name)
         if path.exists():
-            return gpd.read_parquet(path)
-        result = compute_fn()
-        result.to_parquet(path)
+            result = gpd.read_parquet(path)
+        else:
+            result = compute_fn()
+            result.to_parquet(path)
+        if result.index.duplicated().any():
+            result = result[~result.index.duplicated(keep="first")]
         return result
 
     # ------------------------------------------------------------------
