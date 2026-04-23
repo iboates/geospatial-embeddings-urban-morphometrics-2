@@ -91,38 +91,37 @@ def run_embedding_pipeline(
     morpho_all = compute_urban_morphometrics(
         study_area_gdf=combined,
         pbf_path=None,
-        run_name="chicago_00",
+        run_name="king_county",
         output_folder="urban_morphometrics",
         neighbourhood_distance=300,
         num_quantiles=4,
-        equal_area_crs="ESRI:102008",
-        equidistant_crs="EPSG:23304",
-        conformal_crs="EPSG:23304",
-        n_workers=8,
+        equal_area_crs="EPSG:5070",
+        equidistant_crs="EPSG:2926",
+        conformal_crs="EPSG:2926",
+        n_workers=20,
         use_cache=True,
-        debug=True
     )
 
     # Load OSM features
     logger.info("Loading OSM features for all regions...")
     osm_all = loader.load(combined, osm_filter)
 
-    features_all = osm_all.join(morpho_all, how="outer")
+    print(morpho_all.head())
 
     print(osm_all.head())
 
-    print(morpho_all.head())
-
-    print(features_all.head())
+    # features_all = osm_all.join(morpho_all, how="outer", lsuffix="fc", rsuffix="um")
+    #
+    # print(features_all.head())
 
     logger.info("Joining OSM features for train regions...")
-    joint_train = joiner.transform(buf_train, features_all)
+    joint_train = joiner.transform(buf_train, osm_all)
 
     logger.info("Joining OSM features for dev regions...")
-    joint_dev = joiner.transform(buf_dev, features_all)
+    joint_dev = joiner.transform(buf_dev, osm_all)
 
     logger.info("Joining OSM features for test regions...")
-    joint_test = joiner.transform(buf_test, features_all)
+    joint_test = joiner.transform(buf_test, osm_all)
 
     # Fit (if needed)
     if requires_fit(embedder_name):
@@ -146,14 +145,19 @@ def run_embedding_pipeline(
         logger.info("Embedder '%s' does not require fitting — skipping.", embedder_name)
 
     # Transform
-    def _transform(buf, osm, joint, label):
+    def _transform(buf, osm, joint, morpho, label):
         logger.info("Transforming %s split...", label)
-        emb = embedder.transform(regions_gdf=buf, features_gdf=osm, joint_gdf=joint)
+        emb = embedder.transform(
+            regions_gdf=buf,
+            osm_features_gdf=osm,
+            joint_gdf=joint,
+            morpho_features_gdf=morpho,
+        )
         emb["h3"] = emb.index
         return emb
 
-    emb_train = _transform(buf_train, osm_all, joint_train, "train")
-    emb_dev = _transform(buf_dev, osm_all, joint_dev, "dev")
-    emb_test = _transform(buf_test, osm_all, joint_test, "test")
+    emb_train = _transform(buf_train, osm_all, joint_train, morpho_all, "train")
+    emb_dev = _transform(buf_dev, osm_all, joint_dev, morpho_all, "dev")
+    emb_test = _transform(buf_test, osm_all, joint_test, morpho_all, "test")
 
     return emb_train, emb_dev, emb_test

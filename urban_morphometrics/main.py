@@ -239,6 +239,7 @@ def compute_urban_morphometrics(
     out_path = results_dir / "metrics.gpkg"
     results_gdf.to_file(out_path, driver="GPKG")
     log.info("Results written to %s", out_path)
+    return results_gdf
 
 
 def _build_parser() -> argparse.ArgumentParser:

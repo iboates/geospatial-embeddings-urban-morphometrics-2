@@ -1,0 +1,21 @@
+# Experiment: UrbanMorphometricsEmbedder (no training needed) on House Sales in King County
+# UrbanMorphometricsEmbedder do not require .fit() with OSM data
+# — they count OSM features and aggregate Urban Morphometrics per region directly.
+
+experiment_name: "urban_morpho_king_county_r9"
+
+embedder:
+  name: "UrbanMorphometricsEmbedder"
+  # CountEmbedder has no hidden_sizes — leave empty
+  hidden_sizes: []
+  fit_kwargs: {}            # CountEmbedder.fit() is a no-op; kept for interface uniformity
+
+model:
+  linear_sizes: [50, 100, 50]
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  early_stopping_patience: 5
+  loss: "SmoothL1"

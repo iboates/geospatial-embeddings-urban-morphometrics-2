@@ -26,7 +26,7 @@ EMBEDDER_REGISTRY: dict[str, tuple[str, str]] = {
 }
 
 # Embedders that do NOT need a fit() call with OSM features
-NO_FIT_EMBEDDERS = {"CountEmbedder"}
+NO_FIT_EMBEDDERS = {"CountEmbedder", "UrbanMorphometricsEmbedder"}
 
 
 def build_embedder(
