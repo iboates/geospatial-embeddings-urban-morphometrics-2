@@ -8,6 +8,7 @@ resolution: 9
 
 # OSM feature filter used for embedding (must match what the embedder expects)
 osm_filter: "HEX2VEC_FILTER"   # currently only HEX2VEC_FILTER is supported
+morpho_filter: "ALL_FILTER"
 
 # Ring-buffer size around each region (used by CCE / GeoVex)
 neighbourhood_radius: 2

@@ -28,6 +28,7 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
         expected_output_features: Optional[
             Union[list[str], OsmTagsFilter, GroupedOsmTagsFilter]
         ] = None,
+        expected_morphology_features: Optional[list[str]] = None,
         count_subcategories: bool = True,
     ) -> None:
         """
@@ -35,6 +36,7 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
 
         Args:
             expected_output_features: The OSM features expected to be found in the resulting embedding.
+            expected_morphology_features: The Urban Morphology Metrics to be found in the resulting embedding.
             count_subcategories: Whether to count all OSM subcategories individually.
         """
         # Pass initialization logic entirely to the parent CountEmbedder
@@ -43,10 +45,12 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
             count_subcategories=count_subcategories,
         )
 
+        self.expected_morphology_features = tuple(expected_morphology_features)
+
     def transform(
         self,
         regions_gdf: gpd.GeoDataFrame,
-        osm_features_gdf: gpd.GeoDataFrame,
+        features_gdf: gpd.GeoDataFrame,
         joint_gdf: gpd.GeoDataFrame,
         morpho_features_gdf: gpd.GeoDataFrame,
     ) -> pd.DataFrame:
@@ -58,7 +62,7 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
 
         Args:
             regions_gdf (gpd.GeoDataFrame): Region indexes and geometries.
-            osm_features_gdf (gpd.GeoDataFrame): Feature indexes, geometries, and OSM values.
+            features_gdf (gpd.GeoDataFrame): Feature indexes, geometries, and OSM values.
             joint_gdf (gpd.GeoDataFrame): Joiner result with region-feature multi-index.
             morpho_features_gdf (gpd.GeoDataFrame): Pre-aggregated morphological features,
                 indexed by the region ID (e.g., H3 index).
@@ -67,10 +71,9 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
             pd.DataFrame: Combined embedding for each region.
         """
         # 1. Generate the standard count embeddings using the parent class method
-        # Note: We map `osm_features_gdf` to the parent's `features_gdf` parameter
         count_embeddings_df = super().transform(
             regions_gdf=regions_gdf,
-            features_gdf=osm_features_gdf,
+            features_gdf=features_gdf,
             joint_gdf=joint_gdf,
         )
 
@@ -80,6 +83,12 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
         # Embeddings should only contain numerical features, so we drop the geometry column
         if GEOMETRY_COLUMN in morpho_df.columns:
             morpho_df = morpho_df.drop(columns=[GEOMETRY_COLUMN])
+
+        morpho_df = morpho_df[
+            morpho_df.columns[
+                morpho_df.columns.str.startswith(self.expected_morphology_features)
+            ]
+        ]
 
         # 3. Concatenate the dataframes
         # Since both dataframes use the region ID as the index (e.g., REGIONS_INDEX),

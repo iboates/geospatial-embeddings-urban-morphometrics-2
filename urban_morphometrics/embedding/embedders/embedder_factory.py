@@ -33,6 +33,7 @@ def build_embedder(
     name: str,
     hidden_sizes: list[int],
     osm_filter: Any,
+    morpho_filter: Any | None = None,
     neighbourhood: Any | None = None,
     neighbourhood_radius: int = 2,
 ) -> Any:
@@ -44,6 +45,7 @@ def build_embedder(
         hidden_sizes: Architecture sizes (ignored for embedders that don't use them).
         osm_filter: OSM feature filter (passed as `target_features` or
                     `expected_output_features` depending on embedder).
+        morpho_filter: Urban Morphology Metrics filter
         neighbourhood: H3Neighbourhood (required for ContextualCountEmbedder).
         neighbourhood_radius: Radius for neighbourhood-based embedders.
 
@@ -81,6 +83,16 @@ def build_embedder(
             expected_output_features=osm_filter,
             concatenate_vectors=True,
             count_subcategories=True,
+        )
+
+    elif name == "UrbanMorphometricsEmbedder":
+        if morpho_filter is None:
+            raise ValueError(
+                "UrbanMorphoMetricsEmbedder requires a `morpho_filter` object"
+            )
+        embedder = cls(
+            expected_output_features=osm_filter,
+            expected_morphology_features=morpho_filter,
         )
 
     else:

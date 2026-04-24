@@ -37,6 +37,7 @@ from urban_morphometrics.embedding.data.preparation import (
 )
 from urban_morphometrics.embedding.embedders.embedder_factory import build_embedder
 from urban_morphometrics.embedding.embedders.pipeline import (
+    get_morpho_filter,
     get_osm_filter,
     run_embedding_pipeline,
 )
@@ -118,22 +119,29 @@ def run(config_path: str) -> dict:
     # ── Embedder ─────────────────────────────────────────────────────────────
     emb_cfg = cfg["embedder"]
     osm_filter = get_osm_filter(cfg["osm_filter"])
+    morpho_filter = get_morpho_filter(cfg["morpho_filter"])
     embedder = build_embedder(
         name=emb_cfg["name"],
         hidden_sizes=emb_cfg.get("hidden_sizes", []),
         osm_filter=osm_filter,
+        morpho_filter=morpho_filter,
         neighbourhood_radius=cfg["neighbourhood_radius"],
     )
 
-    embedding_logger = WandbLogger(project="Urban Morphometrics - Embedding")
+    embedding_logger = WandbLogger(
+        name=exp_name, project="Urban Morphometrics - Embedding"
+    )
 
     fit_kwargs = emb_cfg.get("fit_kwargs", {})
 
     fit_kwargs.setdefault("trainer_kwargs", {}).update({"logger": embedding_logger})
 
+    morpho_cfg = cfg.get("morphometrics", {})
+
     emb_train, emb_dev, emb_test = run_embedding_pipeline(
         embedder=embedder,
         embedder_name=emb_cfg["name"],
+        exp_name=exp_name,
         regions_train=regions_train,
         regions_dev=regions_dev,
         regions_test=regions_test,
@@ -141,6 +149,7 @@ def run(config_path: str) -> dict:
         osm_filter=osm_filter,
         neighbourhood_radius=cfg["neighbourhood_radius"],
         fit_kwargs=fit_kwargs,
+        morpho_cfg=morpho_cfg,
     )
     wandb.finish()
 
@@ -179,7 +188,9 @@ def run(config_path: str) -> dict:
     evaluator = HexRegressionEvaluator()
 
     # ── Train ────────────────────────────────────────────────────────────────
-    regression_logger = WandbLogger(project="Urban Morphometrics - Regressor")
+    regression_logger = WandbLogger(
+        name=exp_name, project="Urban Morphometrics - Regressor"
+    )
 
     callbacks = [
         EarlyStopping(monitor="val_loss", patience=5),

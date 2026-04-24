@@ -22,6 +22,7 @@ from srai.loaders.osm_loaders.filters import HEX2VEC_FILTER
 from srai.neighbourhoods.h3_neighbourhood import H3Neighbourhood
 
 from urban_morphometrics.embedding.embedders.embedder_factory import requires_fit
+from urban_morphometrics.embedding.filters import ALL_FILTER
 from urban_morphometrics.main import compute_urban_morphometrics
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,11 @@ logger = logging.getLogger(__name__)
 # ── OSM filter registry ────────────────────────────────────────────────────────
 OSM_FILTER_REGISTRY: dict[str, Any] = {
     "HEX2VEC_FILTER": HEX2VEC_FILTER,
+    # ← Add more filters here
+}
+
+MORPHO_FILTER_REGISTRY: dict[str, Any] = {
+    "ALL_FILTER": ALL_FILTER,
     # ← Add more filters here
 }
 
@@ -42,9 +48,23 @@ def get_osm_filter(name: str) -> Any:
     return OSM_FILTER_REGISTRY[name]
 
 
+def get_morpho_filter(name: str) -> Any:
+    if name not in MORPHO_FILTER_REGISTRY:
+        raise ValueError(
+            f"Unknown OSM filter '{name}'. "
+            f"Available: {list(MORPHO_FILTER_REGISTRY.keys())}"
+        )
+    raw_morpho_filter = MORPHO_FILTER_REGISTRY[name]
+    morpho_filter = []
+    for _, metrics in raw_morpho_filter.items():
+        morpho_filter.extend(metrics)
+    return morpho_filter
+
+
 def run_embedding_pipeline(
     embedder,
     embedder_name: str,
+    exp_name: str,
     regions_train: gpd.GeoDataFrame,
     regions_dev: gpd.GeoDataFrame,
     regions_test: gpd.GeoDataFrame,
@@ -52,6 +72,7 @@ def run_embedding_pipeline(
     osm_filter: Any,
     neighbourhood_radius: int,
     fit_kwargs: dict,
+    morpho_cfg: dict,
 ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     """
     Run the full embed pipeline for train / dev / test splits.
@@ -68,16 +89,6 @@ def run_embedding_pipeline(
     buf_dev = ring_buffer_h3_regions_gdf(regions_dev, neighbourhood_radius)
     buf_test = ring_buffer_h3_regions_gdf(regions_test, neighbourhood_radius)
 
-    # combined = gpd.GeoDataFrame(
-    #     geometry=[
-    #         unary_union(
-    #             list(buf_train.geometry)
-    #             + list(buf_dev.geometry)
-    #             + list(buf_test.geometry)
-    #         )
-    #     ],
-    #     crs=buf_train.crs,
-    # )
     combined = gpd.GeoDataFrame(
         pd.concat([buf_train, buf_dev, buf_test], ignore_index=False), crs=buf_train.crs
     )
@@ -86,33 +97,29 @@ def run_embedding_pipeline(
 
     logger.info("Loading OSM features for combined region (single pass)...")
 
-    # Compute Urban Morphometrics
-    logger.info("Loading Urban Morphometrics features for all regions...")
-    morpho_all = compute_urban_morphometrics(
-        study_area_gdf=combined,
-        pbf_path=None,
-        run_name="king_county",
-        output_folder="urban_morphometrics",
-        neighbourhood_distance=300,
-        num_quantiles=4,
-        equal_area_crs="EPSG:5070",
-        equidistant_crs="EPSG:2926",
-        conformal_crs="EPSG:2926",
-        n_workers=20,
-        use_cache=True,
-    )
+    morpho_kwargs = {}
+
+    if morpho_cfg:
+        # Compute Urban Morphometrics
+        logger.info("Loading Urban Morphometrics features for all regions...")
+        morpho_all = compute_urban_morphometrics(
+            study_area_gdf=combined,
+            pbf_path=None,
+            run_name=exp_name,
+            output_folder="urban_morphometrics",
+            neighbourhood_distance=morpho_cfg["neighbourhood_distance"],
+            num_quantiles=morpho_cfg["num_quantiles"],
+            equal_area_crs=morpho_cfg["equal_area_crs"],
+            equidistant_crs=morpho_cfg["equidistant_crs"],
+            conformal_crs=morpho_cfg["conformal_crs"],
+            n_workers=20,
+            use_cache=True,
+        )
+        morpho_kwargs["morpho_features_gdf"] = morpho_all
 
     # Load OSM features
     logger.info("Loading OSM features for all regions...")
     osm_all = loader.load(combined, osm_filter)
-
-    print(morpho_all.head())
-
-    print(osm_all.head())
-
-    # features_all = osm_all.join(morpho_all, how="outer", lsuffix="fc", rsuffix="um")
-    #
-    # print(features_all.head())
 
     logger.info("Joining OSM features for train regions...")
     joint_train = joiner.transform(buf_train, osm_all)
@@ -145,19 +152,19 @@ def run_embedding_pipeline(
         logger.info("Embedder '%s' does not require fitting — skipping.", embedder_name)
 
     # Transform
-    def _transform(buf, osm, joint, morpho, label):
+    def _transform(buf, osm, joint, label, morpho_kwargs):
         logger.info("Transforming %s split...", label)
         emb = embedder.transform(
             regions_gdf=buf,
-            osm_features_gdf=osm,
+            features_gdf=osm,
             joint_gdf=joint,
-            morpho_features_gdf=morpho,
+            **morpho_kwargs,
         )
         emb["h3"] = emb.index
         return emb
 
-    emb_train = _transform(buf_train, osm_all, joint_train, morpho_all, "train")
-    emb_dev = _transform(buf_dev, osm_all, joint_dev, morpho_all, "dev")
-    emb_test = _transform(buf_test, osm_all, joint_test, morpho_all, "test")
+    emb_train = _transform(buf_train, osm_all, joint_train, "train", morpho_kwargs)
+    emb_dev = _transform(buf_dev, osm_all, joint_dev, "dev", morpho_kwargs)
+    emb_test = _transform(buf_test, osm_all, joint_test, "test", morpho_kwargs)
 
     return emb_train, emb_dev, emb_test

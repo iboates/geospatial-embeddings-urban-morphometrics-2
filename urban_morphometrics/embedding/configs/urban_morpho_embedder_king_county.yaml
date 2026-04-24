@@ -4,6 +4,8 @@
 
 experiment_name: "urban_morpho_king_county_r9"
 
+resolution: 9
+
 embedder:
   name: "UrbanMorphometricsEmbedder"
   # CountEmbedder has no hidden_sizes — leave empty
@@ -19,3 +21,10 @@ training:
   learning_rate: 0.001
   early_stopping_patience: 5
   loss: "SmoothL1"
+
+morphometrics:
+  neighbourhood_distance: 300
+  num_quantiles: 4
+  equal_area_crs: "EPSG:5070"
+  equidistant_crs: "EPSG:2926"
+  conformal_crs: "EPSG:2926"
