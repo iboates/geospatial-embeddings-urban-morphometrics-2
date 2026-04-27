@@ -22,6 +22,10 @@ EMBEDDER_REGISTRY: dict[str, tuple[str, str]] = {
         "urban_morphometrics.embedding.embedders.urban_morphometrics_embedder",
         "UrbanMorphometricsEmbedder",
     ),
+    "Hex2VecUrbanMorphometrics": (
+        "urban_morphometrics.embedding.embedders.hex2vec_urban_morphometrics_embedder",
+        "UrbanMorphometricsHex2VecEmbedder",
+    ),
     # ← Add more embedders here
 }
 
@@ -85,11 +89,9 @@ def build_embedder(
             count_subcategories=True,
         )
 
-    elif name == "UrbanMorphometricsEmbedder":
+    elif name in ("UrbanMorphometricsEmbedder", "Hex2VecUrbanMorphometrics"):
         if morpho_filter is None:
-            raise ValueError(
-                "UrbanMorphoMetricsEmbedder requires a `morpho_filter` object"
-            )
+            raise ValueError(f"{name} requires a `morpho_filter` object")
         embedder = cls(
             expected_output_features=osm_filter,
             expected_morphology_features=morpho_filter,

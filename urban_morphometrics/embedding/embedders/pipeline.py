@@ -147,6 +147,7 @@ def run_embedding_pipeline(
                 joint_gdf=joint_train,
                 neighbourhood=neighbourhood,
                 **_fit_kwargs,
+                **morpho_kwargs,
             )
     else:
         logger.info("Embedder '%s' does not require fitting — skipping.", embedder_name)

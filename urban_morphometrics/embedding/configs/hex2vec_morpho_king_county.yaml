@@ -1,0 +1,37 @@
+# Experiment: Hex2Vec embedder on the House Sales in King County dataset
+# Inherits defaults from configs/base.yaml — only overrides are listed here.
+
+experiment_name: "hex2vec_morpho_king_county_r9"
+
+dataset:
+  name: "HouseSalesInKingCounty"
+  version: "9"
+  use_numerical_columns: false
+  aggregation: "average"
+  dev_size: 0.1
+
+embedder:
+  name: "Hex2VecUrbanMorphometrics"
+  hidden_sizes: [150, 75, 50]
+  fit_kwargs:
+    batch_size: 256
+    trainer_kwargs:
+      max_epochs: 10
+
+model:
+  linear_sizes: [50, 100, 50]
+  dropout_p: 0.2
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001
+  early_stopping_patience: 5
+  loss: "SmoothL1"
+
+morphometrics:
+  neighbourhood_distance: 300
+  num_quantiles: 4
+  equal_area_crs: "EPSG:5070"
+  equidistant_crs: "EPSG:2926"
+  conformal_crs: "EPSG:2926"
