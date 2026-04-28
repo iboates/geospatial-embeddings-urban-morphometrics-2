@@ -1,4 +1,4 @@
-# Experiment: Hex2Vec embedder on the House Sales in King County dataset
+# Experiment: Hex2Vec Morphometrics embedder on the House Sales in King County dataset
 # Inherits defaults from configs/base.yaml — only overrides are listed here.
 
 experiment_name: "hex2vec_morpho_king_county_r9"

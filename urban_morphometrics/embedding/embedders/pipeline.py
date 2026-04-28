@@ -15,6 +15,7 @@ from typing import Any
 
 import geopandas as gpd
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from srai.h3 import ring_buffer_h3_regions_gdf
 from srai.joiners import IntersectionJoiner
 from srai.loaders.osm_loaders import OSMPbfLoader
@@ -97,6 +98,19 @@ def run_embedding_pipeline(
 
     logger.info("Loading OSM features for combined region (single pass)...")
 
+    # Load OSM features
+    logger.info("Loading OSM features for all regions...")
+    osm_all = loader.load(combined, osm_filter)
+
+    logger.info("Joining OSM features for train regions...")
+    joint_train = joiner.transform(buf_train, osm_all)
+
+    logger.info("Joining OSM features for dev regions...")
+    joint_dev = joiner.transform(buf_dev, osm_all)
+
+    logger.info("Joining OSM features for test regions...")
+    joint_test = joiner.transform(buf_test, osm_all)
+
     morpho_kwargs = {}
 
     if morpho_cfg:
@@ -115,20 +129,28 @@ def run_embedding_pipeline(
             n_workers=20,
             use_cache=True,
         )
-        morpho_kwargs["morpho_features_gdf"] = morpho_all
 
-    # Load OSM features
-    logger.info("Loading OSM features for all regions...")
-    osm_all = loader.load(combined, osm_filter)
+        # Get morpho feature columns (exclude geometry)
+        morpho_feature_cols = [col for col in morpho_all.columns if col != "geometry"]
 
-    logger.info("Joining OSM features for train regions...")
-    joint_train = joiner.transform(buf_train, osm_all)
+        # Join morpho features to train/dev/test splits
+        logger.info("Joining morpho features to train/dev/test splits...")
+        morpho_train = buf_train.join(morpho_all[morpho_feature_cols])
 
-    logger.info("Joining OSM features for dev regions...")
-    joint_dev = joiner.transform(buf_dev, osm_all)
+        # Fit MinMaxScaler on train morpho features
+        logger.info("Fitting MinMaxScaler on train morpho features...")
+        scaler = MinMaxScaler()
+        morpho_train_features = morpho_train[morpho_feature_cols].copy()
+        scaler.fit(morpho_train_features)
 
-    logger.info("Joining OSM features for test regions...")
-    joint_test = joiner.transform(buf_test, osm_all)
+        # Apply scaling to all splits
+        logger.info("Scaling morpho features for all splits...")
+        morpho_all_scaled = morpho_all.copy()
+        morpho_all_scaled[morpho_feature_cols] = scaler.transform(
+            morpho_all[morpho_feature_cols]
+        )
+
+        morpho_kwargs["morpho_features_gdf"] = morpho_all_scaled
 
     # Fit (if needed)
     if requires_fit(embedder_name):
