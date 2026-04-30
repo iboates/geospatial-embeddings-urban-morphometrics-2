@@ -119,7 +119,7 @@ def run_embedding_pipeline(
         morpho_all = compute_urban_morphometrics(
             study_area_gdf=combined,
             pbf_path=None,
-            run_name=exp_name,
+            run_name=morpho_cfg["cache_name"],
             output_folder="urban_morphometrics",
             neighbourhood_distance=morpho_cfg["neighbourhood_distance"],
             num_quantiles=morpho_cfg["num_quantiles"],

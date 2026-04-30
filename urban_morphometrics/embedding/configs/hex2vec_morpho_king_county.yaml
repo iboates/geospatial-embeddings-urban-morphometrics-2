@@ -30,6 +30,7 @@ training:
   loss: "SmoothL1"
 
 morphometrics:
+  cache_name: "king_county_r9"
   neighbourhood_distance: 300
   num_quantiles: 4
   equal_area_crs: "EPSG:5070"

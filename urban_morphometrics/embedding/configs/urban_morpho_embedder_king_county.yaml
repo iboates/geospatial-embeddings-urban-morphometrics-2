@@ -8,9 +8,9 @@ resolution: 9
 
 embedder:
   name: "UrbanMorphometricsEmbedder"
-  # CountEmbedder has no hidden_sizes — leave empty
+  # UrbanMorphometricsEmbedder has no hidden_sizes — leave empty
   hidden_sizes: []
-  fit_kwargs: {}            # CountEmbedder.fit() is a no-op; kept for interface uniformity
+  fit_kwargs: {}            # UrbanMorphometricsEmbedder.fit() is a no-op; kept for interface uniformity
 
 model:
   linear_sizes: [50, 100, 50]
@@ -23,6 +23,7 @@ training:
   loss: "SmoothL1"
 
 morphometrics:
+  cache_name: "king_county_r9"
   neighbourhood_distance: 300
   num_quantiles: 4
   equal_area_crs: "EPSG:5070"
