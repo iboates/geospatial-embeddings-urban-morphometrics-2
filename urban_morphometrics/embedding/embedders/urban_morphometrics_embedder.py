@@ -71,11 +71,16 @@ class UrbanMorphometricsEmbedder(CountEmbedder):
             pd.DataFrame: Combined embedding for each region.
         """
         # 1. Generate the standard count embeddings using the parent class method
-        count_embeddings_df = super().transform(
-            regions_gdf=regions_gdf,
-            features_gdf=features_gdf,
-            joint_gdf=joint_gdf,
-        )
+        if self.expected_output_features is not None:
+            count_embeddings_df = super().transform(
+                regions_gdf=regions_gdf,
+                features_gdf=features_gdf,
+                joint_gdf=joint_gdf,
+            )
+        else:
+            count_embeddings_df = pd.DataFrame(regions_gdf).drop(
+                columns=[GEOMETRY_COLUMN]
+            )
 
         # 2. Process the morphological features GeoDataFrame
         morpho_df = pd.DataFrame(morpho_features_gdf)

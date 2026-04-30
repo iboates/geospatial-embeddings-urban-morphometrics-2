@@ -4,6 +4,8 @@ Use metric prefixes with startswith() to match all variations (mean, median, std
 Example: col.startswith("floor_area") matches floor_area_mean, floor_area_std, floor_area_q50, etc.
 """
 
+EMPTY_FILTER = None
+
 ALL_FILTER = {
     # Dimension Metrics - building size and volume
     "courtyard_area": ["courtyard_area"],

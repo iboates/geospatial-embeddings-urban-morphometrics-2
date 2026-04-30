@@ -16,6 +16,7 @@ from typing import Any
 import geopandas as gpd
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from srai.constants import GEOMETRY_COLUMN
 from srai.h3 import ring_buffer_h3_regions_gdf
 from srai.joiners import IntersectionJoiner
 from srai.loaders.osm_loaders import OSMPbfLoader
@@ -23,7 +24,7 @@ from srai.loaders.osm_loaders.filters import HEX2VEC_FILTER
 from srai.neighbourhoods.h3_neighbourhood import H3Neighbourhood
 
 from urban_morphometrics.embedding.embedders.embedder_factory import requires_fit
-from urban_morphometrics.embedding.filters import ALL_FILTER
+from urban_morphometrics.embedding.filters import ALL_FILTER, EMPTY_FILTER
 from urban_morphometrics.main import compute_urban_morphometrics
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── OSM filter registry ────────────────────────────────────────────────────────
 OSM_FILTER_REGISTRY: dict[str, Any] = {
     "HEX2VEC_FILTER": HEX2VEC_FILTER,
-    # ← Add more filters here
+    "EMPTY": EMPTY_FILTER,
 }
 
 MORPHO_FILTER_REGISTRY: dict[str, Any] = {
@@ -99,17 +100,24 @@ def run_embedding_pipeline(
     logger.info("Loading OSM features for combined region (single pass)...")
 
     # Load OSM features
-    logger.info("Loading OSM features for all regions...")
-    osm_all = loader.load(combined, osm_filter)
+    if osm_filter:
+        logger.info("Loading OSM features for all regions...")
+        osm_all = loader.load(combined, osm_filter)
 
-    logger.info("Joining OSM features for train regions...")
-    joint_train = joiner.transform(buf_train, osm_all)
+        logger.info("Joining OSM features for train regions...")
+        joint_train = joiner.transform(buf_train, osm_all)
 
-    logger.info("Joining OSM features for dev regions...")
-    joint_dev = joiner.transform(buf_dev, osm_all)
+        logger.info("Joining OSM features for dev regions...")
+        joint_dev = joiner.transform(buf_dev, osm_all)
 
-    logger.info("Joining OSM features for test regions...")
-    joint_test = joiner.transform(buf_test, osm_all)
+        logger.info("Joining OSM features for test regions...")
+        joint_test = joiner.transform(buf_test, osm_all)
+    else:
+        osm_all = gpd.GeoDataFrame(columns=[GEOMETRY_COLUMN])
+
+        joint_train = gpd.GeoDataFrame(columns=[GEOMETRY_COLUMN])
+        joint_dev = gpd.GeoDataFrame(columns=[GEOMETRY_COLUMN])
+        joint_test = gpd.GeoDataFrame(columns=[GEOMETRY_COLUMN])
 
     morpho_kwargs = {}
 
